@@ -1,16 +1,16 @@
 /**
  * credentialsFile.js
  *
- * Stores a single admin credential set in a JSON file on disk.
- * This replaces the DB `users` table for authentication purposes.
+ * Stores ALL app credentials in a single JSON file on disk.
+ * This replaces both the DB `users` table and the `app_settings` table.
  *
- * File location: <cwd>/credentials.json
- * (Same working directory the backend process starts from)
+ * File location: <backend-root>/credentials.json
  *
  * Schema:
  * {
  *   "username": "admin",
- *   "passwordHash": "$2a$10$...",
+ *   "passwordHash": "$2a$10$...",      ← bcrypt hash of login password
+ *   "crudPasswordHash": "$2a$10$...", ← bcrypt hash of Edit/Delete Herb password (null if not yet set)
  *   "fullName": "Administrator",
  *   "role": "ROLE_ADMIN",
  *   "mustChangePassword": true
@@ -68,6 +68,7 @@ export async function initCredentials() {
   const creds = {
     username: DEFAULT_USERNAME,
     passwordHash,
+    crudPasswordHash: null,
     fullName: DEFAULT_FULL_NAME,
     role: 'ROLE_ADMIN',
     mustChangePassword: true,

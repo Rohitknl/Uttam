@@ -1,28 +1,31 @@
-import prisma from '../config/database.js';
+/**
+ * settingsService.js
+ *
+ * Manages the Edit/Delete Herb password (CRUD password).
+ * The hash is stored in credentials.json under `crudPasswordHash`,
+ * alongside the login password hash — no database table required.
+ */
+
 import { AppError } from '../middleware/errorHandler.js';
 import { comparePassword, hashPassword } from '../utils/bcrypt.js';
+import { readCredentials, writeCredentials } from '../utils/credentialsFile.js';
 
-const CRUD_PASSWORD_KEY = 'crud_password_hash';
+// ─── CRUD password helpers ────────────────────────────────────────────────
 
 export async function isCrudPasswordSet() {
-  const row = await prisma.appSetting.findUnique({ where: { key: CRUD_PASSWORD_KEY } });
-  return Boolean(row?.value);
+  const creds = readCredentials();
+  return Boolean(creds?.crudPasswordHash);
 }
 
 export async function verifyCrudPassword(plain) {
-  const row = await prisma.appSetting.findUnique({ where: { key: CRUD_PASSWORD_KEY } });
-  if (!row?.value) return false;
-  return comparePassword(String(plain || ''), row.value);
+  const creds = readCredentials();
+  if (!creds?.crudPasswordHash) return false;
+  return comparePassword(String(plain || ''), creds.crudPasswordHash);
 }
 
-async function verifyLoginPassword(userId, plain) {
-  if (!plain) return false;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user?.password) return false;
-  return comparePassword(String(plain), user.password);
-}
+// ─── Set / reset CRUD password ────────────────────────────────────────────
 
-export async function setCrudPassword(userId, {
+export async function setCrudPassword(_userId, {
   currentPassword,
   loginPassword,
   newPassword,
@@ -35,32 +38,44 @@ export async function setCrudPassword(userId, {
     throw new AppError('New password and confirm password do not match', 400);
   }
 
-  const alreadySet = await isCrudPasswordSet();
+  const creds = readCredentials();
+  if (!creds) throw new AppError('Credentials file not found', 500);
+
+  const alreadySet = Boolean(creds.crudPasswordHash);
+
   if (alreadySet) {
     const confirmValue = currentPassword || loginPassword || '';
     if (!confirmValue) {
-      throw new AppError('Enter your current Edit/Delete Herb Password, or your login password to reset', 400);
+      throw new AppError(
+        'Enter your current Edit/Delete Herb Password, or your login password to reset',
+        400,
+      );
     }
 
-    const crudOk = await verifyCrudPassword(confirmValue);
-    const loginOk = crudOk ? false : await verifyLoginPassword(userId, confirmValue);
+    // Accept either the current CRUD password OR the admin login password
+    const crudOk = await comparePassword(confirmValue, creds.crudPasswordHash);
+    const loginOk = crudOk ? false : await comparePassword(confirmValue, creds.passwordHash);
+
     if (!crudOk && !loginOk) {
-      throw new AppError('Password is incorrect. Use the current Edit/Delete Herb Password, or your login password.', 403);
+      throw new AppError(
+        'Password is incorrect. Use the current Edit/Delete Herb Password, or your login password.',
+        403,
+      );
     }
   }
 
-  const hashed = await hashPassword(String(newPassword));
-  await prisma.appSetting.upsert({
-    where: { key: CRUD_PASSWORD_KEY },
-    create: { key: CRUD_PASSWORD_KEY, value: hashed },
-    update: { value: hashed },
-  });
+  const crudPasswordHash = await hashPassword(String(newPassword));
+  writeCredentials({ ...creds, crudPasswordHash });
 
   return {
     crudPasswordSet: true,
-    message: alreadySet ? 'Edit/Delete Herb Password reset successfully' : 'Edit/Delete Herb Password set successfully',
+    message: alreadySet
+      ? 'Edit/Delete Herb Password reset successfully'
+      : 'Edit/Delete Herb Password set successfully',
   };
 }
+
+// ─── Security status ──────────────────────────────────────────────────────
 
 export async function getSecurityStatus() {
   return { crudPasswordSet: await isCrudPasswordSet() };

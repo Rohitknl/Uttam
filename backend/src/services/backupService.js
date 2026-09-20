@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { execFileSync } from 'child_process';
 
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -80,6 +81,9 @@ function isWindowsDrivePath(value) {
   return /^[A-Za-z]:[\\/]/.test(value);
 }
 
+// Subfolder created inside each drive / macOS location to hold backup files
+const BACKUP_SUBFOLDER = 'UttamLab' + path.sep + 'Backups';
+
 function driveExists(letter) {
   try {
     return fs.existsSync(`${letter}:\\`);
@@ -90,142 +94,150 @@ function driveExists(letter) {
 
 /*
  * ============================================================
- * DRIVE DISCOVERY
+ * DRIVE DISCOVERY (Windows + macOS/Linux)
  * ============================================================
  *
- * Automatically detects Windows drives A: through Z:.
+ * On Windows:
+ *   Uses PowerShell (Win32_LogicalDisk) to get all drives with
+ *   type and volume name in one call. Falls back to A-Z scan
+ *   if PowerShell is unavailable.
  *
- * This includes:
- *   - C:
- *   - D:
- *   - E:
- *   - USB/Pen drives
- *   - External HDD/SSD
- *   - Mounted network drives
- *   - Other Windows volumes
+ *   DriveType values:
+ *     2 = Removable  (USB pen drive, SD card, etc.)
+ *     3 = Fixed      (internal / external HDD, SSD)
+ *     4 = Network    (mapped network drive)
+ *     5 = CD-ROM
  *
- * A device without a Windows drive letter cannot be detected
- * through this method.
+ * On macOS/Linux:
+ *   Returns Desktop, Documents, and Home.
+ *
+ * Backup files are stored in a dedicated subfolder inside each
+ * location:  <drive or dir>\UttamLab\Backups
  * ============================================================
  */
 
 export function getAvailableDrives() {
-  // On non-Windows platforms, return common directory destinations instead.
   if (process.platform !== 'win32') {
     return getNonWindowsDestinations();
   }
+  return getWindowsDrives();
+}
 
-  const drives = [];
-
-  for (
-    let code = 'A'.charCodeAt(0);
-    code <= 'Z'.charCodeAt(0);
-    code++
-  ) {
-    const letter = String.fromCharCode(code);
-
-    if (!driveExists(letter)) {
-      continue;
-    }
-
-    const rootPath = `${letter}:\\`;
-
-    let label = `${letter}:`;
-
-    try {
-      const volumeName = getWindowsVolumeLabel(letter);
-
-      if (volumeName) {
-        label = `${letter}: - ${volumeName}`;
-      }
-    } catch {
-      // Keep default label.
-    }
-
-    drives.push({
-      id: `drive_${letter.toLowerCase()}`,
-      type: 'drive',
-      letter,
-      name: `${letter}:`,
-      label,
-      path: rootPath,
-    });
+/** Drive-type number → human-readable label */
+function driveTypeLabel(type) {
+  switch (Number(type)) {
+    case 2: return 'Removable';
+    case 3: return 'Fixed';
+    case 4: return 'Network';
+    case 5: return 'CD-ROM';
+    default: return 'Drive';
   }
+}
 
-  return drives;
+/**
+ * Use PowerShell to enumerate all logical disks in one call.
+ * Returns null on failure so the caller can fall back.
+ */
+function getWindowsDrivesViaPowerShell() {
+  try {
+    const raw = execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile', '-NonInteractive', '-Command',
+        'Get-WmiObject -Class Win32_LogicalDisk | Select-Object DeviceID,DriveType,VolumeName | ConvertTo-Json -Compress',
+      ],
+      { encoding: 'utf8', timeout: 6000, windowsHide: true },
+    );
+
+    const parsed = JSON.parse(raw.trim());
+    // PowerShell returns an object (not array) when there is only one drive
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fallback: scan A-Z with fs.existsSync.
+ * Less info (no volume name / type), but always works.
+ */
+function getWindowsDrivesFallback() {
+  const results = [];
+  for (let code = 'A'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
+    const letter = String.fromCharCode(code);
+    if (!driveExists(letter)) continue;
+    results.push({ letter, volumeName: '', driveType: 3 });
+  }
+  return results;
+}
+
+/**
+ * Build the full destination list for Windows.
+ * Each entry's `path` points to the dedicated backup subfolder
+ * (e.g. D:\UttamLab\Backups) so backups never land in the root.
+ */
+function getWindowsDrives() {
+  const raw = getWindowsDrivesViaPowerShell() || getWindowsDrivesFallback();
+
+  return raw
+    .filter(d => {
+      const letter = String((d.DeviceID || d.letter || '').replace(':', '')).toUpperCase();
+      if (!/^[A-Z]$/.test(letter)) return false;
+      // Skip CD-ROM drives (DriveType 5) — can't write to them
+      if (Number(d.DriveType ?? d.driveType) === 5) return false;
+      return driveExists(letter);
+    })
+    .map(d => {
+      const letter = String((d.DeviceID || d.letter || '').replace(':', '')).toUpperCase();
+      const typeNum  = Number(d.DriveType ?? d.driveType ?? 3);
+      const typeStr  = driveTypeLabel(typeNum);
+      const volName  = String(d.VolumeName ?? d.volumeName ?? '').trim();
+      const rootPath = `${letter}:\\`;
+      const backupPath = path.join(rootPath, BACKUP_SUBFOLDER);
+
+      const labelParts = [`${letter}:`, typeStr];
+      if (volName) labelParts.push(`"${volName}"`);
+      labelParts.push(`→ ${backupPath}`);
+
+      return {
+        id:     `drive_${letter.toLowerCase()}`,
+        type:   typeStr.toLowerCase(),
+        letter,
+        name:   `${letter}: (${typeStr}${volName ? ' — ' + volName : ''})`,
+        label:  labelParts.join(' '),
+        path:   backupPath,
+      };
+    });
 }
 
 /**
  * Non-Windows backup destinations (macOS / Linux).
- * Returns Desktop, Documents, and home directory as choices.
+ * Backups go to a dedicated subfolder within each location.
  */
 function getNonWindowsDestinations() {
   const home = os.homedir();
+  const sub  = path.join('UttamLab', 'Backups');
+
   const candidates = [
-    { id: 'dir_desktop',   name: 'Desktop',   path: path.join(home, 'Desktop') },
-    { id: 'dir_documents', name: 'Documents', path: path.join(home, 'Documents') },
-    { id: 'dir_home',      name: 'Home',      path: home },
+    { id: 'dir_desktop',   name: 'Desktop',   base: path.join(home, 'Desktop') },
+    { id: 'dir_documents', name: 'Documents', base: path.join(home, 'Documents') },
+    { id: 'dir_home',      name: 'Home',      base: home },
   ];
 
   return candidates
     .filter(d => {
-      try { return fs.statSync(d.path).isDirectory(); } catch { return false; }
+      try { return fs.statSync(d.base).isDirectory(); } catch { return false; }
     })
-    .map(d => ({
-      ...d,
-      type: 'folder',
-      label: `${d.name} (${d.path})`,
-    }));
-}
-
-/*
- * Try to read Windows volume label.
- *
- * This intentionally uses a lightweight command only when
- * available. If it fails, drive discovery still works.
- */
-function getWindowsVolumeLabel(letter) {
-  if (process.platform !== 'win32') {
-    return '';
-  }
-
-  try {
-    const { execFileSync } = require('child_process');
-
-    const output = execFileSync(
-      'cmd.exe',
-      [
-        '/c',
-        `for /f "tokens=*" %a in ('vol ${letter}:') do @echo %a`,
-      ],
-      {
-        encoding: 'utf8',
-        windowsHide: true,
-        timeout: 2000,
-      }
-    );
-
-    const text = String(output || '').trim();
-
-    const match = text.match(
-      /Volume in drive .* is (.*)/i
-    );
-
-    if (match && match[1]) {
-      const volume = match[1].trim();
-
-      if (
-        volume &&
-        !/^has no label/i.test(volume)
-      ) {
-        return volume;
-      }
-    }
-  } catch {
-    // Ignore volume label errors.
-  }
-
-  return '';
+    .map(d => {
+      const backupPath = path.join(d.base, sub);
+      return {
+        id:    d.id,
+        type:  'folder',
+        name:  d.name,
+        label: `${d.name}  →  ${backupPath}`,
+        path:  backupPath,
+      };
+    });
 }
 
 /*

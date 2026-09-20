@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DatabaseBackup, Download, Upload } from 'lucide-react';
+import { DatabaseBackup, Download, Upload, RefreshCw } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Select, Input, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +15,7 @@ export default function BackupPage() {
   const [backupPassword, setBackupPassword] = useState('');
   const [restorePassword, setRestorePassword] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -25,6 +26,24 @@ export default function BackupPage() {
     if (list.length && !list.find(d => d.id === backupDestinationId)) {
       setBackupDestinationId(list[0].id);
       setRestoreDestinationId(list[0].id);
+    }
+    return list;
+  };
+
+  const refreshDrives = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const list = await backupApi.destinations();
+      setDestinations(list);
+      if (list.length) {
+        setBackupDestinationId(prev => list.find(d => d.id === prev) ? prev : list[0].id);
+        setRestoreDestinationId(prev => list.find(d => d.id === prev) ? prev : list[0].id);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to refresh drives');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -122,6 +141,17 @@ export default function BackupPage() {
       <PageHeader
         title="Backup & Restore"
         subtitle="Save all app data to your hard drive, or install a previous backup"
+        action={
+          <button
+            onClick={refreshDrives}
+            disabled={refreshing}
+            title="Refresh drive list (plug in USB first, then click)"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-line hover:bg-forest-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Scanning...' : 'Refresh Drives'}
+          </button>
+        }
       />
 
       {message && <div className="mb-4"><Alert type="success">{message}</Alert></div>}

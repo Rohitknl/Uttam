@@ -342,11 +342,4 @@ model OrderItem {
   @@map("order_items")
 }
 
-model AppSetting {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("app_settings")
-}
 
