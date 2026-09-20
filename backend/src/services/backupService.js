@@ -631,7 +631,7 @@ function resolveDestination(
   folderPath = null
 ) {
   /*
-   * New preferred approach: caller supplies an actual folder path.
+   * 1. Direct folderPath parameter supplied
    */
   if (folderPath) {
     const safePath = validateFolderPath(folderPath);
@@ -644,10 +644,24 @@ function resolveDestination(
   }
 
   /*
-   * Check if destinationId matches a known non-Windows destination (dir_desktop etc.)
-   * or a Windows drive destination (drive_c etc.).
+   * 2. Direct absolute path passed as destinationId
    */
-  const knownDests = getAvailableDrives(); // works cross-platform now
+  if (destinationId && typeof destinationId === 'string') {
+    if (path.isAbsolute(destinationId) || /^[A-Za-z]:[\\/]/.test(destinationId)) {
+      const safePath = validateFolderPath(destinationId);
+      return {
+        id: Buffer.from(safePath, 'utf8').toString('base64url'),
+        label: safePath,
+        path: safePath,
+        type: 'folder',
+      };
+    }
+  }
+
+  /*
+   * 3. Check known drive destinations (dir_desktop, drive_c, etc.)
+   */
+  const knownDests = getAvailableDrives();
   const known = knownDests.find(d => d.id === destinationId);
   if (known) {
     return {
@@ -657,7 +671,7 @@ function resolveDestination(
   }
 
   /*
-   * If destinationId looks like a base64url-encoded path, decode it.
+   * 4. Encoded base64url path
    */
   if (destinationId && typeof destinationId === 'string') {
     try {
@@ -969,27 +983,17 @@ export async function restoreBackup(
 ) {
   /*
    * ----------------------------------------------------------
-   * 1. Resolve destination
+   * 1. Resolve source backup file path
    * ----------------------------------------------------------
    */
 
-  const dest =
-    resolveDestination(
-      destinationId,
-      folderPath
-    );
-
-  /*
-   * ----------------------------------------------------------
-   * 2. Validate backup file
-   * ----------------------------------------------------------
-   */
-
-  const sourcePath =
-    validateBackupFilePath(
-      dest.path,
-      fileName
-    );
+  let sourcePath;
+  if (fileName && (path.isAbsolute(fileName) || /^[A-Za-z]:[\\/]/.test(fileName))) {
+    sourcePath = path.normalize(fileName);
+  } else {
+    const dest = resolveDestination(destinationId, folderPath);
+    sourcePath = validateBackupFilePath(dest.path, fileName);
+  }
 
   if (!fs.existsSync(sourcePath)) {
     throw new AppError(
