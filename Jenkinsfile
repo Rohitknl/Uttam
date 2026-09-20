@@ -48,6 +48,7 @@ pipeline {
             environment {
                 NODE_ENV = 'production'
                 PORT = '5000'
+                DATABASE_URL = 'file:./dev.db'
                 STATIC_DIR = '../frontend/dist'
                 JENKINS_NODE_COOKIE = 'dontKillMe'
                 BUILD_ID = 'dontKillMe'
@@ -58,7 +59,7 @@ pipeline {
                     sh '''
                         export BUILD_ID=dontKillMe
                         npx pm2 delete uttam-backend || true
-                        PORT=5000 STATIC_DIR=../frontend/dist npx pm2 start src/index.js --name "uttam-backend"
+                        PORT=5000 DATABASE_URL=file:./dev.db STATIC_DIR=../frontend/dist npx pm2 start src/index.js --name "uttam-backend" --update-env
                         npx pm2 save
                     '''
                 }
