@@ -8,7 +8,7 @@
   "scripts": {
     "prepare:desktop": "node scripts/prepare-desktop.mjs",
     "electron:dev": "node scripts/prepare-desktop.mjs && electron .",
-    "dist": "node scripts/prepare-desktop.mjs && electron-builder --win nsis portable",
+    "dist": "node scripts/prepare-desktop.mjs && electron-builder --win nsis",
     "dist:dir": "node scripts/prepare-desktop.mjs && electron-builder --win dir"
   },
   "devDependencies": {
@@ -53,12 +53,6 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
@@ -70,9 +64,6 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Uttam Laboratory",
       "uninstallDisplayName": "Uttam Laboratory"
-    },
-    "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
     }
   }
 }
