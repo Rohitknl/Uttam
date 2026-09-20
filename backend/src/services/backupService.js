@@ -1209,17 +1209,18 @@ export async function restoreBackup(
      * --------------------------------------------------------
      */
 
-    const missingTables =
-      currentTableNames.filter(
-        (name) =>
-          !backupTableNames.includes(
-            name
-          )
-      );
+    const IGNORED_MISSING_TABLES = new Set([
+      'app_settings',
+      'users',
+      '_prisma_migrations',
+      'sqlite_sequence',
+    ]);
 
-    if (
-      missingTables.length > 0
-    ) {
+    const missingTables = currentTableNames.filter(
+      (name) => !IGNORED_MISSING_TABLES.has(name) && !backupTableNames.includes(name)
+    );
+
+    if (missingTables.length > 0) {
       throw new Error(
         `Backup is not compatible with current database. ` +
         `Missing tables: ${missingTables.join(', ')}`
@@ -1246,24 +1247,12 @@ export async function restoreBackup(
       await prisma.$transaction(
         async (tx) => {
           /*
-           * Clear existing data.
+           * Clear existing data for matching tables.
            */
-          for (
-            const table of
-              currentTables
-          ) {
-            const tableName =
-              table.name;
-
-            if (
-              !/^[A-Za-z_][A-Za-z0-9_]*$/.test(
-                tableName
-              )
-            ) {
-              throw new Error(
-                `Invalid table name: ${tableName}`
-              );
-            }
+          for (const table of currentTables) {
+            const tableName = table.name;
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tableName)) continue;
+            if (!backupTableNames.includes(tableName)) continue;
 
             await tx.$executeRawUnsafe(
               `DELETE FROM main."${tableName}";`
@@ -1271,34 +1260,12 @@ export async function restoreBackup(
           }
 
           /*
-           * Copy data from backup.
+           * Copy data from backup for matching tables.
            */
-          for (
-            const table of
-              currentTables
-          ) {
-            const tableName =
-              table.name;
-
-            if (
-              !/^[A-Za-z_][A-Za-z0-9_]*$/.test(
-                tableName
-              )
-            ) {
-              throw new Error(
-                `Invalid table name: ${tableName}`
-              );
-            }
-
-            if (
-              !backupTableNames.includes(
-                tableName
-              )
-            ) {
-              throw new Error(
-                `Table "${tableName}" does not exist in backup`
-              );
-            }
+          for (const table of currentTables) {
+            const tableName = table.name;
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tableName)) continue;
+            if (!backupTableNames.includes(tableName)) continue;
 
             const mainCols = await tx.$queryRawUnsafe(`PRAGMA table_info("${tableName}");`);
             const backupCols = await tx.$queryRawUnsafe(`PRAGMA backup_db.table_info("${tableName}");`);
