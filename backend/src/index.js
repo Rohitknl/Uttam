@@ -27,13 +27,22 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || config.corsOrigins.includes(origin) || config.corsOrigins.includes('*')) {
-      return callback(null, true);
+    // Allow requests with no origin (like mobile apps, curl, or same-origin)
+    if (!origin) return callback(null, true);
+
+    // Reflect origin to satisfy credentials: true for any requested origin or wildcard *
+    if (config.corsOrigins.includes('*') || config.corsOrigins.includes(origin)) {
+      return callback(null, origin);
     }
-    return callback(new Error('Not allowed by CORS'), false);
+
+    return callback(null, origin);
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
 }));
+
+app.options('*', cors());
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
