@@ -4,7 +4,7 @@ Clone of the Ayurvedic inventory app with **SQLite** instead of MySQL (for local
 
 | Folder | Stack | Port |
 |--------|-------|------|
-| `backend/` | Node.js, Express, Prisma, **SQLite** | 8080 |
+| `backend/` | Node.js, Express, Prisma, **SQLite** | 5000 |
 | `frontend/` | React 19, Vite, Tailwind CSS 4 | 5173 |
 
 The original MySQL project remains at `../ayurveda-inventory/`.

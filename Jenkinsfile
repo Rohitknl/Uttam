@@ -36,12 +36,13 @@ pipeline {
         stage('Deploy Application') {
             environment {
                 NODE_ENV = 'production'
+                PORT = '5000'
             }
             steps {
-                echo 'Deploying backend with PM2...'
+                echo 'Deploying backend with PM2 on port 5000...'
                 dir('backend') {
                     sh '''
-                        pm2 restart uttam-backend || pm2 start src/index.js --name "uttam-backend"
+                        pm2 restart uttam-backend || PORT=5000 pm2 start src/index.js --name "uttam-backend"
                     '''
                 }
             }

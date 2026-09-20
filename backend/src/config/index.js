@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: parseInt(process.env.PORT || '8080', 10),
+  port: parseInt(process.env.PORT || '5000', 10),
   host: process.env.HOST || '127.0.0.1',
   databaseUrl: process.env.DATABASE_URL,
   staticDir: process.env.STATIC_DIR || '',
