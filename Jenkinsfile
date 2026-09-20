@@ -17,18 +17,19 @@ pipeline {
 
         stage('Build Frontend') {
             steps {
-                echo 'Building React frontend...'
+                echo 'Building React frontend bundle...'
                 dir('frontend') {
                     sh 'npm run build'
                 }
             }
         }
 
-        stage('Setup Backend & Prisma') {
+        stage('Setup Backend & Database') {
             steps {
-                echo 'Generating Prisma Client...'
+                echo 'Generating Prisma Client and setting up SQLite database...'
                 dir('backend') {
                     sh 'npx prisma generate'
+                    sh 'npx prisma db push --skip-generate'
                 }
             }
         }
@@ -37,12 +38,18 @@ pipeline {
             environment {
                 NODE_ENV = 'production'
                 PORT = '5000'
+                STATIC_DIR = '../frontend/dist'
+                JENKINS_NODE_COOKIE = 'dontKillMe'
+                BUILD_ID = 'dontKillMe'
             }
             steps {
-                echo 'Deploying backend with PM2 on port 5000...'
+                echo 'Deploying application with PM2 on port 5000...'
                 dir('backend') {
                     sh '''
-                        pm2 restart uttam-backend || PORT=5000 pm2 start src/index.js --name "uttam-backend"
+                        export BUILD_ID=dontKillMe
+                        npx pm2 delete uttam-backend || true
+                        PORT=5000 STATIC_DIR=../frontend/dist npx pm2 start src/index.js --name "uttam-backend"
+                        npx pm2 save
                     '''
                 }
             }
