@@ -27,22 +27,29 @@ run('npm', ['run', 'build'], frontend);
 console.log('Generating Prisma client...');
 run('npx', ['prisma', 'generate'], backend);
 
+const devDb = path.join(backend, 'prisma', 'dev.db');
+
 for (const suffix of ['', '-wal', '-shm', '-journal']) {
   const p = `${templateDb}${suffix}`;
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }
 
-console.log('Preparing SQLite template database (does not touch your working dev.db)...');
-const templateUrl = 'file:./template.db';
-run('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], backend, {
-  DATABASE_URL: templateUrl,
-});
-run('node', ['seeds/clean.js'], backend, {
-  DATABASE_URL: templateUrl,
-});
+if (fs.existsSync(devDb)) {
+  console.log('Copying working dev.db to template.db so exact database state is shipped with Electron...');
+  fs.copyFileSync(devDb, templateDb);
+} else {
+  console.log('Preparing SQLite template database...');
+  const templateUrl = 'file:./template.db';
+  run('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], backend, {
+    DATABASE_URL: templateUrl,
+  });
+  run('node', ['seeds/clean.js'], backend, {
+    DATABASE_URL: templateUrl,
+  });
+}
 
 if (!fs.existsSync(templateDb)) {
-  console.error('Expected backend/prisma/template.db after seed');
+  console.error('Expected backend/prisma/template.db after prepare');
   process.exit(1);
 }
 
