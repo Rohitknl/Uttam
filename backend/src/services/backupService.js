@@ -987,11 +987,19 @@ export async function restoreBackup(
    * ----------------------------------------------------------
    */
 
+  let dest;
   let sourcePath;
   if (fileName && (path.isAbsolute(fileName) || /^[A-Za-z]:[\\/]/.test(fileName))) {
     sourcePath = path.normalize(fileName);
+    const parentDir = path.dirname(sourcePath);
+    dest = {
+      id: Buffer.from(parentDir, 'utf8').toString('base64url'),
+      label: parentDir,
+      path: parentDir,
+      type: 'folder',
+    };
   } else {
-    const dest = resolveDestination(destinationId, folderPath);
+    dest = resolveDestination(destinationId, folderPath);
     sourcePath = validateBackupFilePath(dest.path, fileName);
   }
 
@@ -1292,11 +1300,21 @@ export async function restoreBackup(
               );
             }
 
-            await tx.$executeRawUnsafe(`
-              INSERT INTO main."${tableName}"
-              SELECT *
-              FROM backup_db."${tableName}";
-            `);
+            const mainCols = await tx.$queryRawUnsafe(`PRAGMA table_info("${tableName}");`);
+            const backupCols = await tx.$queryRawUnsafe(`PRAGMA backup_db.table_info("${tableName}");`);
+
+            const mainColNames = (mainCols || []).map(c => c.name);
+            const backupColNames = (backupCols || []).map(c => c.name);
+            const commonCols = mainColNames.filter(c => backupColNames.includes(c));
+
+            if (commonCols.length > 0) {
+              const colList = commonCols.map(c => `"${c}"`).join(', ');
+              await tx.$executeRawUnsafe(`
+                INSERT INTO main."${tableName}" (${colList})
+                SELECT ${colList}
+                FROM backup_db."${tableName}";
+              `);
+            }
           }
         }
       );
