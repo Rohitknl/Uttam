@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        DATABASE_URL = 'file:./dev.db'
+        PORT = '5000'
+    }
+
     stages {
         stage('Install Dependencies') {
             steps {
@@ -26,10 +31,15 @@ pipeline {
 
         stage('Setup Backend & Database') {
             steps {
-                echo 'Generating Prisma Client and setting up SQLite database...'
+                echo 'Setting up backend environment and SQLite database...'
                 dir('backend') {
-                    sh 'npx prisma generate'
-                    sh 'npx prisma db push --skip-generate'
+                    sh '''
+                        if [ ! -f .env ]; then
+                            cp .env.example .env
+                        fi
+                        npx prisma generate
+                        npx prisma db push --skip-generate --accept-data-loss
+                    '''
                 }
             }
         }
