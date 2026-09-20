@@ -86,9 +86,9 @@ export default function HerbsPage() {
 
   const handleSave = async () => {
     const isCreate = modal === 'create';
-    const stockValue = String(stockRef.current?.value ?? form.currentStock).trim();
-    const alertValue = String(alertRef.current?.value ?? form.alertCount).trim();
-    const rateValue = String(rateRef.current?.value ?? form.costPerUnit).trim();
+    const stockValue = String(form.currentStock ?? '').trim();
+    const alertValue = String(form.alertCount ?? '').trim();
+    const rateValue = String(form.costPerUnit ?? '').trim();
 
     const missing = [];
     if (!String(form.herbCodeId || '').trim()) missing.push('Herb Code');
@@ -259,49 +259,37 @@ export default function HerbsPage() {
             options={UNITS.map(u => ({ value: u, label: u }))}
             onChange={val => updateForm({ unitOfMeasure: val })}
           />
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1">Total Stock</label>
-            <input
-              ref={stockRef}
-              type="text"
-              inputMode="decimal"
-              value={form.currentStock}
-              onChange={e => {
-                const v = e.target.value;
-                if (v === '' || /^\d*\.?\d*$/.test(v)) updateForm({ currentStock: v });
-              }}
-              className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1">Alert Count</label>
-            <input
-              ref={alertRef}
-              type="text"
-              inputMode="decimal"
-              value={form.alertCount}
-              onChange={e => {
-                const v = e.target.value;
-                if (v === '' || /^\d*\.?\d*$/.test(v)) updateForm({ alertCount: v });
-              }}
-              className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700"
-              placeholder="e.g. 10"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1">Latest Rate (₹)</label>
-            <input
-              ref={rateRef}
-              type="text"
-              inputMode="decimal"
-              value={form.costPerUnit}
-              onChange={e => {
-                const v = e.target.value;
-                if (v === '' || /^\d*\.?\d*$/.test(v)) updateForm({ costPerUnit: v });
-              }}
-              className="w-full px-3 py-2 rounded-lg border border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700"
-            />
-          </div>
+          <Input
+            label="Total Stock"
+            type="text"
+            inputMode="decimal"
+            value={form.currentStock}
+            onChange={e => {
+              const v = e.target.value;
+              if (v === '' || /^\d*\.?\d*$/.test(v)) updateForm({ currentStock: v });
+            }}
+          />
+          <Input
+            label="Alert Count"
+            type="text"
+            inputMode="decimal"
+            value={form.alertCount}
+            onChange={e => {
+              const v = e.target.value;
+              if (v === '' || /^\d*\.?\d*$/.test(v)) updateForm({ alertCount: v });
+            }}
+            placeholder="e.g. 10"
+          />
+          <Input
+            label="Latest Rate (₹)"
+            type="text"
+            inputMode="decimal"
+            value={form.costPerUnit}
+            onChange={e => {
+              const v = e.target.value;
+              if (v === '' || /^\d*\.?\d*$/.test(v)) updateForm({ costPerUnit: v });
+            }}
+          />
           <Input label="Store Number" value={form.storeNumber} onChange={e => updateForm({ storeNumber: e.target.value })} />
           <DropdownSelect
             label="Kanaster / Bora / Drum"

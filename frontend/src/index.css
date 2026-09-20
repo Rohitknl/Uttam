@@ -54,3 +54,15 @@ body {
 .panel-scroll::-webkit-scrollbar-corner {
   background: #e8f0ea;
 }
+
+/* Explicit text cursor and blinking caret for all form inputs */
+input, textarea {
+  caret-color: #2d5a3d !important;
+  cursor: text !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+select {
+  cursor: pointer !important;
+}
