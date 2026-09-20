@@ -1,24 +1,26 @@
 pipeline {
     agent any
 
-    environment {
-        NODE_ENV = 'production'
-    }
-
     stages {
         stage('Install Dependencies') {
             steps {
                 echo 'Installing root, frontend, and backend dependencies...'
-                sh 'npm install'
-                sh 'npm --prefix frontend install'
-                sh 'npm --prefix backend install'
+                sh 'npm install --include=dev'
+                dir('frontend') {
+                    sh 'npm install --include=dev'
+                }
+                dir('backend') {
+                    sh 'npm install --include=dev'
+                }
             }
         }
 
         stage('Build Frontend') {
             steps {
                 echo 'Building React frontend...'
-                sh 'npm --prefix frontend run build'
+                dir('frontend') {
+                    sh 'npm run build'
+                }
             }
         }
 
@@ -32,6 +34,9 @@ pipeline {
         }
 
         stage('Deploy Application') {
+            environment {
+                NODE_ENV = 'production'
+            }
             steps {
                 echo 'Deploying backend with PM2...'
                 dir('backend') {
