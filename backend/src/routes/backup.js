@@ -12,17 +12,28 @@ router.get('/destinations', asyncHandler(async (_req, res) => {
 }));
 
 router.get('/list', asyncHandler(async (req, res) => {
-  res.json(backupService.listBackups(req.query.destinationId || 'c_uttam'));
+  // destinationId is required — front-end always sends it after loading destinations
+  const { destinationId } = req.query;
+  if (!destinationId) {
+    return res.status(400).json({ message: 'destinationId query param is required' });
+  }
+  res.json(backupService.listBackups(destinationId));
 }));
 
 router.post('/create', requireHerbCodeCrudPassword, asyncHandler(async (req, res) => {
-  const destinationId = req.body?.destinationId || 'c_uttam';
+  const { destinationId } = req.body || {};
+  if (!destinationId) {
+    return res.status(400).json({ message: 'destinationId is required' });
+  }
   res.status(201).json(await backupService.createBackup(destinationId));
 }));
 
 router.post('/restore', requireHerbCodeCrudPassword, asyncHandler(async (req, res) => {
   const { destinationId, fileName } = req.body || {};
-  res.json(await backupService.restoreBackup(destinationId || 'c_uttam', fileName));
+  if (!destinationId) {
+    return res.status(400).json({ message: 'destinationId is required' });
+  }
+  res.json(await backupService.restoreBackup(destinationId, fileName));
 }));
 
 export default router;

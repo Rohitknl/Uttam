@@ -110,6 +110,11 @@ function driveExists(letter) {
  */
 
 export function getAvailableDrives() {
+  // On non-Windows platforms, return common directory destinations instead.
+  if (process.platform !== 'win32') {
+    return getNonWindowsDestinations();
+  }
+
   const drives = [];
 
   for (
@@ -148,6 +153,29 @@ export function getAvailableDrives() {
   }
 
   return drives;
+}
+
+/**
+ * Non-Windows backup destinations (macOS / Linux).
+ * Returns Desktop, Documents, and home directory as choices.
+ */
+function getNonWindowsDestinations() {
+  const home = os.homedir();
+  const candidates = [
+    { id: 'dir_desktop',   name: 'Desktop',   path: path.join(home, 'Desktop') },
+    { id: 'dir_documents', name: 'Documents', path: path.join(home, 'Documents') },
+    { id: 'dir_home',      name: 'Home',      path: home },
+  ];
+
+  return candidates
+    .filter(d => {
+      try { return fs.statSync(d.path).isDirectory(); } catch { return false; }
+    })
+    .map(d => ({
+      ...d,
+      type: 'folder',
+      label: `${d.name} (${d.path})`,
+    }));
 }
 
 /*
@@ -271,25 +299,29 @@ function validateFolderPath(folderPath) {
     );
   }
 
-  const normalized = normalizeWindowsPath(
-    folderPath
-  );
+  const normalized = path.normalize(folderPath);
 
-  const driveRoot =
-    getAvailableDriveRootForPath(normalized);
-
-  if (!driveRoot) {
-    throw new AppError(
-      'Invalid or unavailable drive',
-      400
-    );
+  // On Windows, additionally verify the drive is available.
+  if (process.platform === 'win32') {
+    const driveRoot = getAvailableDriveRootForPath(normalized);
+    if (!driveRoot) {
+      throw new AppError(
+        'Invalid or unavailable drive',
+        400
+      );
+    }
   }
 
   if (!fs.existsSync(normalized)) {
-    throw new AppError(
-      'Selected folder does not exist',
-      404
-    );
+    // Auto-create the directory so backup works on first use.
+    try {
+      fs.mkdirSync(normalized, { recursive: true });
+    } catch {
+      throw new AppError(
+        'Selected folder does not exist and could not be created',
+        404
+      );
+    }
   }
 
   let stat;
@@ -587,50 +619,39 @@ function resolveDestination(
   folderPath = null
 ) {
   /*
-   * New preferred approach:
-   *
-   * caller supplies an actual selected folder.
+   * New preferred approach: caller supplies an actual folder path.
    */
   if (folderPath) {
-    const safePath =
-      validateFolderPath(folderPath);
-
+    const safePath = validateFolderPath(folderPath);
     return {
-      id: Buffer.from(
-        safePath,
-        'utf8'
-      ).toString('base64url'),
-
+      id: Buffer.from(safePath, 'utf8').toString('base64url'),
       label: safePath,
-
       path: safePath,
-
       type: 'folder',
     };
   }
 
   /*
-   * If destinationId looks like an encoded folder ID,
-   * decode it.
+   * Check if destinationId matches a known non-Windows destination (dir_desktop etc.)
+   * or a Windows drive destination (drive_c etc.).
    */
-  if (
-    destinationId &&
-    typeof destinationId === 'string'
-  ) {
+  const knownDests = getAvailableDrives(); // works cross-platform now
+  const known = knownDests.find(d => d.id === destinationId);
+  if (known) {
+    return {
+      ...known,
+      path: validateFolderPath(known.path),
+    };
+  }
+
+  /*
+   * If destinationId looks like a base64url-encoded path, decode it.
+   */
+  if (destinationId && typeof destinationId === 'string') {
     try {
-      const decoded =
-        Buffer.from(
-          destinationId,
-          'base64url'
-        ).toString('utf8');
-
-      if (
-        isWindowsDrivePath(decoded) &&
-        fs.existsSync(decoded)
-      ) {
-        const safePath =
-          validateFolderPath(decoded);
-
+      const decoded = Buffer.from(destinationId, 'base64url').toString('utf8');
+      if (fs.existsSync(decoded)) {
+        const safePath = validateFolderPath(decoded);
         return {
           id: destinationId,
           label: safePath,
@@ -639,33 +660,8 @@ function resolveDestination(
         };
       }
     } catch {
-      // Continue to drive destination resolution.
+      // fall through
     }
-  }
-
-  /*
-   * Backward compatibility:
-   *
-   * drive_c
-   * drive_d
-   * etc.
-   */
-  const drives =
-    getAvailableDrives();
-
-  const drive =
-    drives.find(
-      (d) =>
-        d.id === destinationId
-    );
-
-  if (drive) {
-    return {
-      ...drive,
-      path: validateFolderPath(
-        drive.path
-      ),
-    };
   }
 
   throw new AppError(
