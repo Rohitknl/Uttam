@@ -1,0 +1,78 @@
+{
+  "name": "uttam-laboratory",
+  "version": "1.0.1",
+  "description": "Uttam Laboratory — Ayurvedic Stock & Inventory (local desktop)",
+  "author": "Uttam Laboratory",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "prepare:desktop": "node scripts/prepare-desktop.mjs",
+    "electron:dev": "node scripts/prepare-desktop.mjs && electron .",
+    "dist": "node scripts/prepare-desktop.mjs && electron-builder --win nsis portable",
+    "dist:dir": "node scripts/prepare-desktop.mjs && electron-builder --win dir"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.uttamlaboratory.lifecycle",
+    "productName": "Uttam Laboratory",
+    "copyright": "Copyright © Uttam Laboratory",
+    "directories": {
+      "output": "release",
+      "buildResources": "electron/build"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "package.json",
+          "src/**/*",
+          "prisma/schema.prisma",
+          "prisma/template.db",
+          "node_modules/**/*"
+        ]
+      },
+      {
+        "from": "frontend/dist",
+        "to": "frontend-dist"
+      }
+    ],
+    "asar": true,
+    "afterPack": "./scripts/afterPack.cjs",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Uttam Laboratory",
+      "uninstallDisplayName": "Uttam Laboratory"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
+  }
+}

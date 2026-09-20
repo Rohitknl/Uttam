@@ -1,0 +1,352 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ROLE_ADMIN
+  ROLE_DEALER
+  ROLE_VIEWER
+}
+
+enum UnitOfMeasure {
+  KG
+  GRAMS
+  LITERS
+  ML
+  PIECES
+}
+
+enum MedicineType {
+  VATI
+  CHURNA
+  ARISHTA
+  SYRUP
+  TAILA
+  GHRITA
+  BHASMA
+  LEHYA
+  KWATH
+  TABLET
+  CAPSULE
+  OTHER
+}
+
+enum ProductionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BatchType {
+  HERB
+  MEDICINE
+}
+
+enum OrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DISPATCHED
+}
+
+enum TaxType {
+  NONE
+  GST
+  IGST
+  BOTH
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique
+  password    String
+  fullName    String   @map("full_name")
+  email       String?
+  phone       String?
+  address     String?
+  companyName String?  @map("company_name")
+  role        UserRole
+  active      Boolean  @default(true)
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@map("users")
+}
+
+model Seller {
+  id        Int      @id @default(autoincrement())
+  name      String
+  contact   String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sellers")
+}
+
+model HerbCode {
+  id   Int    @id @default(autoincrement())
+  code String @unique
+  name String
+
+  herbs     Herb[]
+  billLines SupplierBillLine[]
+
+  @@map("herb_codes")
+}
+
+model MedicineCode {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  name            String
+  description     String?
+  active          Boolean  @default(true)
+  formulaQuantity Decimal  @default(1) @map("formula_quantity")
+  formulaUnit     String   @default("PIECES") @map("formula_unit")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  medicines   Medicine[]
+  recipeItems RecipeItem[]
+
+  @@map("medicine_codes")
+}
+
+model Herb {
+  id                 Int           @id @default(autoincrement())
+  name               String
+  herbCodeId         Int?          @map("herb_code_id")
+  supplierName       String?       @map("supplier_name")
+  supplierContact    String?       @map("supplier_contact")
+  unitOfMeasure      UnitOfMeasure @default(KG) @map("unit_of_measure")
+  currentStock       Decimal       @default(0) @map("current_stock")
+  costPerUnit        Decimal       @default(0) @map("cost_per_unit")
+  minimumStockAlert  Decimal       @default(0) @map("minimum_stock_alert")
+  storeNumber        String?       @map("store_number")
+  kanasterBora       String?       @map("kanaster_bora")
+  kanasterBoraNumber String?       @map("kanaster_bora_number")
+  description        String?
+  active             Boolean       @default(true)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  herbCode    HerbCode?          @relation(fields: [herbCodeId], references: [id])
+  purchases   HerbPurchase[]
+  billLines   SupplierBillLine[]
+  recipeItems RecipeItem[]
+  batches     Batch[]
+
+  @@index([herbCodeId])
+  @@map("herbs")
+}
+
+model HerbPurchase {
+  id           Int      @id @default(autoincrement())
+  herbId       Int      @map("herb_id")
+  quantity     Decimal
+  rate         Decimal
+  amount       Decimal
+  supplierName String?  @map("supplier_name")
+  purchaseDate DateTime @default(now()) @map("purchase_date")
+  billId       Int?     @map("bill_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  herb Herb          @relation(fields: [herbId], references: [id])
+  bill SupplierBill? @relation(fields: [billId], references: [id])
+
+  @@index([herbId])
+  @@index([billId])
+  @@map("herb_purchases")
+}
+
+model SupplierBill {
+  id               Int      @id @default(autoincrement())
+  billNumber       String   @map("bill_number")
+  supplierName     String   @map("supplier_name")
+  supplierContact  String?  @map("supplier_contact")
+  supplierEmail    String?  @map("supplier_email")
+  supplierAddress  String?  @map("supplier_address")
+  consigneeName    String?  @map("consignee_name")
+  consigneeAddress String?  @map("consignee_address")
+  billDate         DateTime @map("bill_date")
+  subtotalAmount   Decimal  @default(0) @map("subtotal_amount")
+  taxType          TaxType  @default(NONE) @map("tax_type")
+  taxPercent       Decimal  @default(0) @map("tax_percent")
+  igstPercent      Decimal  @default(0) @map("igst_percent")
+  taxAmount        Decimal  @default(0) @map("tax_amount")
+  totalAmount      Decimal  @default(0) @map("total_amount")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  lines     SupplierBillLine[]
+  purchases HerbPurchase[]
+
+  @@map("supplier_bills")
+}
+
+model SupplierBillLine {
+  id         Int     @id @default(autoincrement())
+  billId     Int     @map("bill_id")
+  herbId     Int?    @map("herb_id")
+  herbCodeId Int?    @map("herb_code_id")
+  herbCode   String? @map("herb_code")
+  herbName   String  @map("herb_name")
+  quantity   Decimal
+  rate       Decimal
+  amount     Decimal
+  unit       String  @default("KG")
+
+  bill             SupplierBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  herb             Herb?        @relation(fields: [herbId], references: [id])
+  herbCodeRegistry HerbCode?    @relation(fields: [herbCodeId], references: [id])
+
+  @@index([billId])
+  @@index([herbId])
+  @@map("supplier_bill_lines")
+}
+
+model Medicine {
+  id                Int          @id @default(autoincrement())
+  name              String
+  medicineCodeId    Int?         @map("medicine_code_id")
+  type              MedicineType @default(OTHER)
+  unit              String       @default("PIECES")
+  category          String?
+  description       String?
+  batchNumber       String?      @map("batch_number")
+  expiryDate        DateTime?    @map("expiry_date")
+  stockLocation     String?      @map("stock_location")
+  rackCode          String?      @map("rack_code")
+  pricePerUnit      Decimal      @default(0) @map("price_per_unit")
+  currentStock      Decimal      @default(0) @map("current_stock")
+  minimumStockAlert Decimal      @default(0) @map("minimum_stock_alert")
+  active            Boolean      @default(true)
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  medicineCode      MedicineCode?      @relation(fields: [medicineCodeId], references: [id])
+  productionBatches ProductionBatch[]
+  batches           Batch[]
+  orderItems        OrderItem[]
+
+  @@index([medicineCodeId])
+  @@map("medicines")
+}
+
+model RecipeItem {
+  id             Int     @id @default(autoincrement())
+  medicineCodeId Int     @map("medicine_code_id")
+  herbId         Int     @map("herb_id")
+  quantity       Decimal
+  unit           String  @default("KG")
+
+  medicineCode MedicineCode @relation(fields: [medicineCodeId], references: [id], onDelete: Cascade)
+  herb         Herb         @relation(fields: [herbId], references: [id])
+
+  @@unique([medicineCodeId, herbId])
+  @@index([medicineCodeId])
+  @@index([herbId])
+  @@map("recipe_items")
+}
+
+model ProductionBatch {
+  id            Int              @id @default(autoincrement())
+  batchNumber   String           @unique @map("batch_number")
+  medicineId    Int              @map("medicine_id")
+  quantity      Decimal
+  status        ProductionStatus @default(PLANNED)
+  batchNumber2  String?          @map("medicine_batch_number")
+  expiryDate    DateTime?        @map("expiry_date")
+  stockLocation String?          @map("stock_location")
+  rackCode      String?          @map("rack_code")
+  pricePerUnit  Decimal?         @map("price_per_unit")
+  minStockAlert Decimal?         @map("minimum_stock_alert")
+  startedAt     DateTime?        @map("started_at")
+  completedAt   DateTime?        @map("completed_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@index([medicineId])
+  @@map("production_batches")
+}
+
+model Batch {
+  id           Int       @id @default(autoincrement())
+  batchNumber  String    @map("batch_number")
+  type         BatchType
+  herbId       Int?      @map("herb_id")
+  medicineId   Int?      @map("medicine_id")
+  quantity     Decimal
+  expiryDate   DateTime? @map("expiry_date")
+  location     String?
+  rackCode     String?   @map("rack_code")
+  costPerUnit  Decimal?  @map("cost_per_unit")
+  pricePerUnit Decimal?  @map("price_per_unit")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  herb     Herb?     @relation(fields: [herbId], references: [id])
+  medicine Medicine? @relation(fields: [medicineId], references: [id])
+
+  @@index([herbId])
+  @@index([medicineId])
+  @@map("batches")
+}
+
+model Order {
+  id           Int         @id @default(autoincrement())
+  orderNumber  String      @unique @map("order_number")
+  dealerId     Int         @map("dealer_id")
+  status       OrderStatus @default(PENDING)
+  totalAmount  Decimal     @default(0) @map("total_amount")
+  notes        String?
+  rejectReason String?     @map("reject_reason")
+  approvedAt   DateTime?   @map("approved_at")
+  dispatchedAt DateTime?   @map("dispatched_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  dealer User        @relation(fields: [dealerId], references: [id])
+  items  OrderItem[]
+
+  @@index([dealerId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int     @id @default(autoincrement())
+  orderId    Int     @map("order_id")
+  medicineId Int     @map("medicine_id")
+  quantity   Decimal
+  unitPrice  Decimal @map("unit_price")
+  lineTotal  Decimal @map("line_total")
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@index([orderId])
+  @@index([medicineId])
+  @@map("order_items")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+

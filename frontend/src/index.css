@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --color-forest-950: #0f1f14;
+  --color-forest-700: #2d5a3d;
+  --color-forest-100: #e8f2eb;
+  --color-saffron-500: #c4782a;
+  --color-saffron-100: #faf0e4;
+  --color-ink: #1c241e;
+  --color-muted: #5c6b60;
+  --color-line: #d5e0d8;
+  --color-surface: #f7faf7;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: radial-gradient(ellipse at top left, var(--color-forest-100) 0%, var(--color-surface) 50%, #fff 100%);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Reliable, visible scrollbars for table panels and modals (esp. Windows) */
+.panel-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #8fa396 #e8f0ea;
+}
+.panel-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.panel-scroll::-webkit-scrollbar-track {
+  background: #e8f0ea;
+  border-radius: 8px;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: #8fa396;
+  border-radius: 8px;
+  border: 2px solid #e8f0ea;
+}
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: #2d5a3d;
+}
+.panel-scroll::-webkit-scrollbar-corner {
+  background: #e8f0ea;
+}
