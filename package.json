@@ -8,7 +8,7 @@
   "scripts": {
     "prepare:desktop": "node scripts/prepare-desktop.mjs",
     "electron:dev": "node scripts/prepare-desktop.mjs && electron .",
-    "dist": "node scripts/prepare-desktop.mjs && npx electron-builder --win --x64 nsis",
+    "dist": "node scripts/prepare-desktop.mjs && npx electron-builder --win --x64",
     "dist:dir": "node scripts/prepare-desktop.mjs && npx electron-builder --win dir"
   },
   "devDependencies": {
