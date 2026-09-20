@@ -65,8 +65,12 @@ app.use('/api/settings', settingsRoutes);
 
 if (config.staticDir) {
   const staticDir = path.resolve(config.staticDir);
+  console.log(`Serving frontend static files from: ${staticDir}`);
   app.use(express.static(staticDir));
-  app.get(/^(?!\/api).*/, (_req, res) => {
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
     res.sendFile(path.join(staticDir, 'index.html'));
   });
 }

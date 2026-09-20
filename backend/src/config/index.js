@@ -5,7 +5,7 @@ export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   host: process.env.HOST || '0.0.0.0',
   databaseUrl: process.env.DATABASE_URL,
-  staticDir: process.env.STATIC_DIR || '',
+  staticDir: process.env.STATIC_DIR || '../frontend/dist',
   jwtSecret: process.env.JWT_SECRET || 'UttamLifecycleAyurvedaInventorySecretKey2024MustBeAtLeast256BitsLongForHS256',
   jwtExpirationMs: parseInt(process.env.JWT_EXPIRATION_MS || '86400000', 10),
   corsOrigins: (process.env.CORS_ORIGINS || '*').split(','),
