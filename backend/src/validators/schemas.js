@@ -65,7 +65,7 @@ export const herbSchema = z.object({
   unitOfMeasure: z.enum(['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES']),
   currentStock: z.number({ required_error: 'Total stock is required' }),
   costPerUnit: z.number({ required_error: 'Latest rate is required' }),
-  minimumStockAlert: z.number({ required_error: 'Alert count is required' }),
+  minimumStockAlert: z.number({ required_error: 'Minimum stock/alert is required' }),
   storeNumber: z.string().min(1, 'Store number is required'),
   kanasterBora: z.string().min(1, 'Kanaster/Bora/Drum is required'),
   kanasterBoraNumber: z.string().min(1, 'Kanaster/Bora/Drum number is required'),

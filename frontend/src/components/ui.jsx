@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 export function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-xl border border-line shadow-sm ${className}`}>{children}</div>;
+  const hasBg = className.includes('bg-');
+  const hasBorder = className.includes('border-');
+  const baseBg = hasBg ? '' : 'bg-white';
+  const baseBorder = hasBorder ? '' : 'border-line';
+  return <div className={`${baseBg} rounded-xl border ${baseBorder} shadow-sm ${className}`}>{children}</div>;
 }
 
 export function CardHeader({ title, subtitle, action }) {

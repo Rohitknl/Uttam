@@ -4,6 +4,7 @@ import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Modal, Input, DropdownSelect, Table, SearchBar, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { herbsApi, herbCodesApi } from '../../api';
+import { parseHerbCode } from '../../utils/codeParser';
 
 const UNITS = ['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES'];
 const KANASTER_BORA_OPTIONS = ['Kanaster', 'Bora', 'Drum'];
@@ -95,7 +96,7 @@ export default function HerbsPage() {
     if (!String(form.name || '').trim()) missing.push('Herb Name');
     if (!String(form.unitOfMeasure || '').trim()) missing.push('Unit');
     if (!stockValue) missing.push('Total Stock');
-    if (!alertValue) missing.push('Alert Count');
+    if (!alertValue) missing.push('Minimum Stock/Alert');
     if (!rateValue) missing.push('Latest Rate');
     if (!String(form.storeNumber || '').trim()) missing.push('Store Number');
     if (!String(form.kanasterBora || '').trim()) missing.push('Kanaster/Bora/Drum');
@@ -239,11 +240,17 @@ export default function HerbsPage() {
                 ...herbCodes.map(c => ({ value: String(c.id), label: `${c.code} — ${c.name}` })),
               ]}
               onChange={val => {
-                const code = herbCodes.find(c => c.id === parseInt(val, 10));
+                const codeObj = herbCodes.find(c => c.id === parseInt(val, 10));
+                const parsedCode = parseHerbCode(codeObj?.code);
+                const parsedName = parseHerbCode(codeObj?.name);
+                const extractedNumber = parsedCode.number || parsedName.number;
+                const extractedName = (codeObj?.name && codeObj.name !== codeObj.code ? codeObj.name : parsedCode.name || codeObj?.code || '').toUpperCase();
+
                 setForm(prev => ({
                   ...prev,
                   herbCodeId: val,
-                  name: String(code?.name || prev.name || '').toUpperCase(),
+                  name: String(extractedName || prev.name || '').toUpperCase(),
+                  ...(extractedNumber ? { kanasterBoraNumber: extractedNumber } : {}),
                 }));
               }}
             />
@@ -270,7 +277,7 @@ export default function HerbsPage() {
             }}
           />
           <Input
-            label="Alert Count"
+            label="Minimum Stock/Alert"
             type="text"
             inputMode="decimal"
             value={form.alertCount}

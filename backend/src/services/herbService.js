@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { toNumber, toMoney } from '../utils/decimal.js';
+import { parseHerbCode } from '../utils/codeParser.js';
 
 function formatHerb(herb, latestRate) {
   return {
@@ -121,6 +122,10 @@ export async function ensureHerbFromCode(herbCodeId) {
     return formatHerb(existing, rateMap.get(existing.id)?.rate);
   }
 
+  const parsedCode = parseHerbCode(code.code);
+  const parsedName = parseHerbCode(code.name);
+  const extractedNum = parsedCode.number || parsedName.number || null;
+
   const herb = await prisma.herb.create({
     data: {
       name: code.name,
@@ -129,6 +134,7 @@ export async function ensureHerbFromCode(herbCodeId) {
       currentStock: 0,
       costPerUnit: 0,
       minimumStockAlert: 0,
+      kanasterBoraNumber: extractedNum,
       active: true,
     },
     include: { herbCode: true },
@@ -137,13 +143,23 @@ export async function ensureHerbFromCode(herbCodeId) {
 }
 
 export async function createHerb(data) {
+  let herbCodeObj = null;
   if (data.herbCodeId) {
+    herbCodeObj = await prisma.herbCode.findUnique({ where: { id: data.herbCodeId } });
     const existing = await prisma.herb.findFirst({ where: { herbCodeId: data.herbCodeId } });
     if (existing) throw new AppError('Herb code is already assigned to another herb', 400);
   }
+
+  let finalNumber = data.kanasterBoraNumber || null;
+  if (!finalNumber && herbCodeObj) {
+    const parsedCode = parseHerbCode(herbCodeObj.code);
+    const parsedName = parseHerbCode(herbCodeObj.name);
+    finalNumber = parsedCode.number || parsedName.number || null;
+  }
+
   await assertKanasterBoraUnique({
     kanasterBora: data.kanasterBora,
-    kanasterBoraNumber: data.kanasterBoraNumber,
+    kanasterBoraNumber: finalNumber,
   });
   const alertValue = data.minimumStockAlert == null ? 0 : Number(data.minimumStockAlert);
   const herb = await prisma.herb.create({
@@ -154,6 +170,7 @@ export async function createHerb(data) {
       currentStock: data.currentStock ?? 0,
       costPerUnit: data.costPerUnit ?? 0,
       minimumStockAlert: Number.isFinite(alertValue) ? alertValue : 0,
+      kanasterBoraNumber: finalNumber,
       active: data.active !== false,
     },
     include: { herbCode: true },

@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Table, Badge, SearchBar, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { parseHerbCode } from '../../utils/codeParser';
 
 function getCodeSeries(code) {
   const raw = String(code || '').trim().toUpperCase();
@@ -303,7 +304,23 @@ export default function CodesPage({
             value={form.code}
             onChange={e => {
               const code = uppercaseCode ? formatCode(e.target.value) : e.target.value;
-              setForm({ ...form, code });
+              const parsed = parseHerbCode(code);
+              let nextName = form.name;
+              let nextAuto = form._autoName;
+
+              if (parsed.name && (!form.name || form.name === form._autoName)) {
+                const formatted = (uppercaseName || capitalizeName) ? formatName(parsed.name) : parsed.name;
+                nextName = formatted;
+                nextAuto = formatted;
+              }
+
+              setForm({
+                ...form,
+                code,
+                name: nextName,
+                _autoName: nextAuto,
+              });
+
               if (useSeries && modal === 'create') {
                 const { prefix } = getCodeSeries(code);
                 if (prefix && seriesOptions.includes(prefix)) {

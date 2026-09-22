@@ -9,14 +9,14 @@ const TILES = {
     key: 'lowHerbs',
     label: 'Low Stock Herbs',
     empty: 'All herbs are above minimum stock levels.',
-    color: 'text-saffron-500',
+    color: 'text-red-500',
     icon: AlertTriangle,
   },
   lowMedicines: {
     key: 'lowMedicines',
     label: 'Low Stock Medicines',
     empty: 'All medicines are above minimum stock levels.',
-    color: 'text-saffron-500',
+    color: 'text-red-500',
     icon: Package,
   },
   expiring: {
@@ -167,8 +167,8 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader title="Low Stock Herbs" />
+        <Card className={lists.lowHerbs.length > 0 ? 'bg-red-50/50 border-red-300' : ''}>
+          <CardHeader title={<span className={lists.lowHerbs.length > 0 ? 'text-red-700' : ''}>Low Stock Herbs</span>} />
           <CardBody className="p-0">
             {lists.lowHerbs.length === 0 ? (
               <p className="px-6 py-4 text-muted text-sm">{TILES.lowHerbs.empty}</p>
@@ -176,8 +176,8 @@ export default function AdminDashboard() {
               <ul className="divide-y divide-line">
                 {lists.lowHerbs.map(h => (
                   <li key={h.id} className="px-6 py-3 flex justify-between items-center">
-                    <span className="text-sm font-medium">{h.name}</span>
-                    <Badge variant="warning">{h.currentStock} {h.unitOfMeasure}</Badge>
+                    <span className="text-sm font-medium text-ink">{h.name}</span>
+                    <Badge variant="danger">{h.currentStock} {h.unitOfMeasure}</Badge>
                   </li>
                 ))}
               </ul>
@@ -185,8 +185,8 @@ export default function AdminDashboard() {
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader title="Low Stock Medicines" />
+        <Card className={lists.lowMedicines.length > 0 ? 'bg-red-50/50 border-red-300' : ''}>
+          <CardHeader title={<span className={lists.lowMedicines.length > 0 ? 'text-red-700' : ''}>Low Stock Medicines</span>} />
           <CardBody className="p-0">
             {lists.lowMedicines.length === 0 ? (
               <p className="px-6 py-4 text-muted text-sm">{TILES.lowMedicines.empty}</p>
@@ -194,8 +194,8 @@ export default function AdminDashboard() {
               <ul className="divide-y divide-line">
                 {lists.lowMedicines.map(m => (
                   <li key={m.id} className="px-6 py-3 flex justify-between items-center">
-                    <span className="text-sm font-medium">{m.name}</span>
-                    <Badge variant="warning">{m.currentStock}</Badge>
+                    <span className="text-sm font-medium text-ink">{m.name}</span>
+                    <Badge variant="danger">{m.currentStock}</Badge>
                   </li>
                 ))}
               </ul>
@@ -203,8 +203,8 @@ export default function AdminDashboard() {
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader title="Expiring Medicines (30 days)" />
+        <Card className={lists.expiring.length > 0 ? 'bg-red-50/50 border-red-300' : ''}>
+          <CardHeader title={<span className={lists.expiring.length > 0 ? 'text-red-700' : ''}>Expiring Medicines (30 days)</span>} />
           <CardBody className="p-0">
             {lists.expiring.length === 0 ? (
               <p className="px-6 py-4 text-muted text-sm">{TILES.expiring.empty}</p>
@@ -212,7 +212,7 @@ export default function AdminDashboard() {
               <ul className="divide-y divide-line">
                 {lists.expiring.map(m => (
                   <li key={m.id} className="px-6 py-3 flex justify-between items-center">
-                    <span className="text-sm font-medium">{m.name}</span>
+                    <span className="text-sm font-medium text-ink">{m.name}</span>
                     <Badge variant={m.expired ? 'danger' : 'warning'}>
                       {new Date(m.expiryDate).toLocaleDateString()}
                     </Badge>
@@ -324,21 +324,28 @@ export default function AdminDashboard() {
 }
 
 function StatCard({ icon: Icon, label, value, color, onClick }) {
+  const isAlert = value > 0;
   return (
     <button
       type="button"
       onClick={onClick}
-      className="text-left w-full rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-700/30"
+      className={`text-left w-full rounded-xl focus:outline-none focus:ring-2 ${
+        isAlert ? 'focus:ring-red-500/30' : 'focus:ring-forest-700/30'
+      }`}
     >
-      <Card className="hover:border-forest-700/40 transition-colors cursor-pointer h-full">
+      <Card className={`transition-all duration-200 cursor-pointer h-full ${
+        isAlert
+          ? 'bg-red-50/80 border-red-300 hover:border-red-400 shadow-sm shadow-red-100'
+          : 'hover:border-forest-700/40'
+      }`}>
         <CardBody className="flex items-center gap-4">
-          <div className={`p-3 rounded-lg bg-forest-100 ${color}`}>
+          <div className={`p-3 rounded-lg ${isAlert ? 'bg-red-100 text-red-600' : `bg-forest-100 ${color}`}`}>
             <Icon className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-ink">{value}</p>
-            <p className="text-sm text-muted">{label}</p>
-            <p className="text-xs text-forest-700 mt-1">Click to view list</p>
+            <p className={`text-2xl font-bold ${isAlert ? 'text-red-600' : 'text-ink'}`}>{value}</p>
+            <p className={`text-sm ${isAlert ? 'text-red-900 font-semibold' : 'text-muted'}`}>{label}</p>
+            <p className={`text-xs mt-1 ${isAlert ? 'text-red-600 font-medium' : 'text-forest-700'}`}>Click to view list</p>
           </div>
         </CardBody>
       </Card>
