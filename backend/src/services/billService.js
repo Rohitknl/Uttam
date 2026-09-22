@@ -1,7 +1,7 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { toNumber, toMoney, multiply, add, subtract, divide } from '../utils/decimal.js';
-import { parseHerbCode } from '../utils/codeParser.js';
+import { parseHerbName } from '../utils/codeParser.js';
 
 function resolveTaxInput(data = {}) {
   let gstPercent = toNumber(data.gstPercent ?? 0, 2);
@@ -237,9 +237,8 @@ async function addBillLineToHerbStock(tx, billId, line, header) {
       },
     });
   } else {
-    const parsedCode = parseHerbCode(herbCode.code);
-    const parsedLineName = parseHerbCode(line.herbName || herbCode.name);
-    const extractedNum = parsedCode.number || parsedLineName.number || null;
+    const parsedLineName = parseHerbName(line.herbName || herbCode.name);
+    const extractedNum = parsedLineName.number || null;
 
     herb = await tx.herb.create({
       data: {

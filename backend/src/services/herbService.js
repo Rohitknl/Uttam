@@ -1,7 +1,7 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { toNumber, toMoney } from '../utils/decimal.js';
-import { parseHerbCode } from '../utils/codeParser.js';
+import { parseHerbName } from '../utils/codeParser.js';
 
 function formatHerb(herb, latestRate) {
   return {
@@ -122,9 +122,8 @@ export async function ensureHerbFromCode(herbCodeId) {
     return formatHerb(existing, rateMap.get(existing.id)?.rate);
   }
 
-  const parsedCode = parseHerbCode(code.code);
-  const parsedName = parseHerbCode(code.name);
-  const extractedNum = parsedCode.number || parsedName.number || null;
+  const parsedName = parseHerbName(code.name);
+  const extractedNum = parsedName.number || null;
 
   const herb = await prisma.herb.create({
     data: {
@@ -151,10 +150,10 @@ export async function createHerb(data) {
   }
 
   let finalNumber = data.kanasterBoraNumber || null;
-  if (!finalNumber && herbCodeObj) {
-    const parsedCode = parseHerbCode(herbCodeObj.code);
-    const parsedName = parseHerbCode(herbCodeObj.name);
-    finalNumber = parsedCode.number || parsedName.number || null;
+  if (!finalNumber && (data.name || herbCodeObj)) {
+    const targetName = data.name || herbCodeObj?.name;
+    const parsedName = parseHerbName(targetName);
+    finalNumber = parsedName.number || null;
   }
 
   await assertKanasterBoraUnique({
