@@ -1,0 +1,15 @@
+test
+[2026-09-26T18:41:47.822Z] main.cjs evaluated: C:\Users\yogit\OneDrive\Desktop\Yogita\Uttam Laboratory\Uttam Laboratory.exe
+[2026-09-26T18:41:47.838Z] === MAIN PROCESS SCRIPT LOADED ===
+[2026-09-26T18:41:48.056Z] boot starting...
+[2026-09-26T18:41:48.060Z] startBackend: [object Object]
+[2026-09-26T18:41:49.949Z] backendProcess spawned with PID: 23412
+[2026-09-26T18:41:49.951Z] Waiting for server health on http://127.0.0.1:18765/api/health ...
+[2026-09-26T18:42:08.496Z] [api] Serving frontend static files from: C:\Users\yogit\OneDrive\Desktop\Yogita\Uttam Laboratory\resources\frontend-dist
+[2026-09-26T18:42:09.167Z] [api] [Auth] credentials.json loaded (user: admin)
+[2026-09-26T18:42:09.298Z] [api] Uttam Laboratories API running on http://127.0.0.1:18765
+[2026-09-26T18:42:09.549Z] Health check succeeded!
+[2026-09-26T18:42:09.555Z] waitForHealth done, creating window...
+[2026-09-26T18:42:10.556Z] main.cjs evaluated: C:\Users\yogit\OneDrive\Desktop\Yogita\Uttam Laboratory\Uttam Laboratory.exe
+[2026-09-26T18:42:10.566Z] === MAIN PROCESS SCRIPT LOADED ===
+[2026-09-26T18:42:10.573Z] Another instance is already running; quitting duplicate instance.

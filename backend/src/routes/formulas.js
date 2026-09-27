@@ -26,7 +26,7 @@ router.post('/save', validate(formulaSaveSchema), asyncHandler(async (req, res) 
 }));
 
 router.post('/consume', validate(formulaConsumeSchema), asyncHandler(async (req, res) => {
-  res.json(await formulaService.consumeFormula(req.body.medicineCodeId, req.body.batchSize));
+  res.json(await formulaService.consumeFormula(req.body.medicineCodeId, req.body.batchSize, req.body.items));
 }));
 
 export default router;

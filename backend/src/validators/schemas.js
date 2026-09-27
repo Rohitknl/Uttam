@@ -88,7 +88,7 @@ export const herbDeleteSchema = z.object({
 export const medicineSchema = z.object({
   name: z.string().min(1),
   medicineCodeId: z.number().int(),
-  type: z.enum(['VATI', 'CHURNA', 'ARISHTA', 'SYRUP', 'TAILA', 'GHRITA', 'BHASMA', 'LEHYA', 'KWATH', 'TABLET', 'CAPSULE', 'OTHER']).optional(),
+  type: z.string().min(1).optional(),
   unit: z.string().optional(),
   category: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
@@ -182,6 +182,10 @@ export const formulaSaveSchema = z.object({
 export const formulaConsumeSchema = z.object({
   medicineCodeId: z.number().int(),
   batchSize: z.number().positive(),
+  items: z.array(z.object({
+    herbId: z.number().int(),
+    scaledQuantity: z.number().positive(),
+  })).optional(),
 });
 
 export const productionStartSchema = z.object({

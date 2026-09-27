@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Trash2, Pencil, Printer } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Modal, Input, Select, DropdownSelect, Table, SearchBar, PageHeader, LoadingSpinner, Alert, Textarea } from '../../components/ui';
+import { Card, CardBody, Button, Modal, Input, Select, DropdownSelect, Combobox, Table, SearchBar, PageHeader, LoadingSpinner, Alert, Textarea } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { billsApi, herbCodesApi, inventoryApi } from '../../api';
 
@@ -894,19 +894,14 @@ export default function BillsPage() {
             <h4 className="text-sm font-semibold text-forest-700 mb-2 uppercase tracking-wide">Supplier Details</h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Input
+                <Combobox
                   label="Supplier Name"
-                  list="bill-supplier-names"
                   value={form.supplierName}
-                  onChange={e => applySupplierName(e.target.value)}
+                  onChange={applySupplierName}
                   onBlur={e => applySupplierName(e.target.value)}
-                  autoComplete="off"
+                  options={partyDirectory.suppliers.map(s => s.name)}
+                  placeholder="Select or enter supplier"
                 />
-                <datalist id="bill-supplier-names">
-                  {partyDirectory.suppliers.map(s => (
-                    <option key={s.name} value={s.name} />
-                  ))}
-                </datalist>
               </div>
               <Input label="Supplier Telephone (optional)" value={form.supplierContact} onChange={e => setForm({ ...form, supplierContact: e.target.value })} />
               <Input label="Supplier Email (optional)" type="email" value={form.supplierEmail} onChange={e => setForm({ ...form, supplierEmail: e.target.value })} />
@@ -928,19 +923,14 @@ export default function BillsPage() {
             <h4 className="text-sm font-semibold text-forest-700 mb-2 uppercase tracking-wide">Consignee Details</h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Input
+                <Combobox
                   label="Consignee Name"
-                  list="bill-consignee-names"
                   value={form.consigneeName}
-                  onChange={e => applyConsigneeName(e.target.value)}
+                  onChange={applyConsigneeName}
                   onBlur={e => applyConsigneeName(e.target.value)}
-                  autoComplete="off"
+                  options={partyDirectory.consignees.map(c => c.name)}
+                  placeholder="Select or enter consignee"
                 />
-                <datalist id="bill-consignee-names">
-                  {partyDirectory.consignees.map(c => (
-                    <option key={c.name} value={c.name} />
-                  ))}
-                </datalist>
               </div>
               <div className="col-span-2">
                 <Textarea rows={2} label="Consignee Address" value={form.consigneeAddress} onChange={e => setForm({ ...form, consigneeAddress: e.target.value })} />

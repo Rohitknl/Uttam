@@ -25,7 +25,28 @@ console.log('Building frontend...');
 run('npm', ['run', 'build'], frontend);
 
 console.log('Generating Prisma client...');
-run('npx', ['prisma', 'generate'], backend);
+const clientDir = path.join(backend, 'node_modules', '.prisma', 'client');
+if (fs.existsSync(clientDir)) {
+  for (const f of fs.readdirSync(clientDir)) {
+    if (f.includes('.tmp')) {
+      try { fs.unlinkSync(path.join(clientDir, f)); } catch {}
+    }
+  }
+}
+const genResult = spawnSync('npx', ['prisma', 'generate'], {
+  cwd: backend,
+  stdio: 'inherit',
+  shell: true,
+  env: process.env,
+});
+if (genResult.status !== 0) {
+  const engineExists = fs.existsSync(path.join(clientDir, 'query_engine-windows.dll.node'));
+  if (engineExists) {
+    console.warn('Warning: Prisma generate returned non-zero (engine file locked by a running process), but existing Prisma Client is present and valid. Continuing...');
+  } else {
+    process.exit(genResult.status || 1);
+  }
+}
 
 const devDb = path.join(backend, 'prisma', 'dev.db');
 

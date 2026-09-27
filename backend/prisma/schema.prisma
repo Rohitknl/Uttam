@@ -221,7 +221,7 @@ model Medicine {
   id                Int          @id @default(autoincrement())
   name              String
   medicineCodeId    Int?         @map("medicine_code_id")
-  type              MedicineType @default(OTHER)
+  type              String       @default("OTHER")
   unit              String       @default("PIECES")
   category          String?
   description       String?

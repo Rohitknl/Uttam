@@ -165,12 +165,7 @@ export async function saveFormula(medicineCodeId, batchSize, items) {
   return generateFormula(medicineCodeId, batchSize);
 }
 
-export async function consumeFormula(medicineCodeId, batchSize) {
-  const validation = await validateFormula(medicineCodeId, batchSize);
-  if (!validation.valid) {
-    throw new AppError(validation.message || 'Cannot consume — insufficient herb stock', 400);
-  }
-
+export async function consumeFormula(medicineCodeId, batchSize, items = null) {
   const code = await getCodeContext(medicineCodeId);
   const recipe = await getRecipeWithHerbs(medicineCodeId);
   if (recipe.length === 0) {
@@ -180,24 +175,24 @@ export async function consumeFormula(medicineCodeId, batchSize) {
   const baseQty = toNumber(code.formulaQuantity ?? 1) || 1;
   const scale = toNumber(divide(batchSize, baseQty));
 
+  const customQtyByHerb = items && Array.isArray(items)
+    ? Object.fromEntries(items.map(it => [it.herbId, toNumber(it.scaledQuantity)]))
+    : null;
+
   const consumed = [];
   await prisma.$transaction(async (tx) => {
     for (const ri of recipe) {
       const recipeUnit = recipeUnitOf(ri);
       const stockUnit = stockUnitOf(ri);
-      const requiredInRecipeUnit = toNumber(multiply(ri.quantity, scale));
+      const requiredInRecipeUnit = customQtyByHerb && customQtyByHerb[ri.herbId] !== undefined
+        ? customQtyByHerb[ri.herbId]
+        : toNumber(multiply(ri.quantity, scale));
       const requiredInStockUnit = convertQuantity(requiredInRecipeUnit, recipeUnit, stockUnit);
 
       const herb = await tx.herb.findUnique({ where: { id: ri.herbId } });
       const available = toNumber(herb.currentStock);
-      if (available + 1e-9 < requiredInStockUnit) {
-        throw new AppError(
-          `Insufficient stock for ${ri.herb.name}: need ${requiredInRecipeUnit} ${recipeUnit}, have ${convertQuantity(available, stockUnit, recipeUnit)} ${recipeUnit}`,
-          400,
-        );
-      }
-
       const newStock = toNumber(subtract(available, requiredInStockUnit));
+
       await tx.herb.update({
         where: { id: ri.herbId },
         data: { currentStock: newStock },

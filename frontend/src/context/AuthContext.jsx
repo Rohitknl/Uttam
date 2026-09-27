@@ -28,14 +28,18 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem('ul_token');
-    if (token && user) {
+    if (token) {
       authApi.me()
         .then(async (u) => {
           setUser(u);
           localStorage.setItem('ul_user', JSON.stringify(u));
           await refreshSecurity(u.role);
         })
-        .catch(() => { logout(); })
+        .catch((err) => {
+          if (err.response?.status === 401) {
+            logout();
+          }
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);

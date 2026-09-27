@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Modal, Input, Select, Table, SearchBar, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
+import { Card, CardBody, Button, Modal, Input, Select, Combobox, Table, SearchBar, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { medicinesApi, medicineCodesApi } from '../../api';
 
@@ -190,9 +190,13 @@ export default function MedicinesPage() {
           )}
           <Input label="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           <div className="grid grid-cols-2 gap-4">
-            <Select label="Type" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-              {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </Select>
+            <Combobox
+              label="Type"
+              value={form.type}
+              onChange={val => setForm({ ...form, type: val })}
+              options={Array.from(new Set([...TYPES, ...items.map(m => m.type).filter(Boolean)])).sort()}
+              placeholder="Select or enter type"
+            />
             <Input label="Unit" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} />
             <Input label="Store" value={form.stockLocation} onChange={e => setForm({ ...form, stockLocation: e.target.value })} />
             <Input label="Rack Number" value={form.rackCode} onChange={e => setForm({ ...form, rackCode: e.target.value })} />

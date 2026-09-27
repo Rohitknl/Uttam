@@ -50,6 +50,10 @@ function toBatchSize(quantity, fromUnit, toUnit) {
   return qty;
 }
 
+function isDecimalInput(value) {
+  return value === '' || /^\d*\.?\d*$/.test(value);
+}
+
 function QtyUnitField({
   label = 'Medicine Qty / Unit',
   quantity,
@@ -64,11 +68,13 @@ function QtyUnitField({
       {label && <label className="block text-sm font-medium text-ink mb-1">{label}</label>}
       <div className="flex items-stretch rounded-lg border border-line bg-white overflow-hidden focus-within:ring-2 focus-within:ring-forest-700/30 focus-within:border-forest-700">
         <input
-          type="number"
-          min="0"
-          step="any"
+          type="text"
+          inputMode="decimal"
           value={quantity}
-          onChange={onQuantityChange}
+          onChange={e => {
+            const v = e.target.value;
+            if (isDecimalInput(v)) onQuantityChange(e);
+          }}
           disabled={disabled}
           className="flex-1 min-w-0 px-3 py-2 border-0 bg-transparent text-ink focus:outline-none disabled:opacity-60"
           placeholder="Qty"
@@ -159,6 +165,8 @@ export default function FormulaPage() {
   const [generateUnit, setGenerateUnit] = useState('PIECES');
   const [baseFormulaQuantity, setBaseFormulaQuantity] = useState(1);
   const [baseFormulaUnit, setBaseFormulaUnit] = useState('PIECES');
+  const [batchNumber, setBatchNumber] = useState('');
+  const [firmName, setFirmName] = useState('');
 
   const setActiveTab = (tab) => {
     if (tab === 'define') setSearchParams({});
@@ -443,6 +451,7 @@ export default function FormulaPage() {
     setGenerating(true);
     setMessage('');
     setGenerated(null);
+    setIsModified(false);
     try {
       const payload = {
         medicineCodeId: parseInt(selectedMedicineCodeId, 10),
@@ -465,6 +474,8 @@ export default function FormulaPage() {
     const selected = medicineOptions.find(o => String(o.medicineCodeId) === String(selectedMedicineCodeId));
     const code = generated.medicineCode || selected?.code || '—';
     const name = generated.medicineName || selected?.name || '—';
+    const displayFirm = (firmName || '').trim() || 'Uttam Laboratories';
+    const displayBatch = (batchNumber || '').trim();
     const esc = (s) => String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -502,10 +513,12 @@ export default function FormulaPage() {
   </style>
 </head>
 <body>
-  <div class="brand">Uttam Laboratories</div>
+  <div class="brand">${esc(displayFirm)}</div>
   <div class="sub">Ayurvedic Stock &amp; Inventory</div>
   <h1>GENERATED FORMULA</h1>
   <div class="meta">
+    <div><span>Firm Name</span><strong>${esc(displayFirm)}</strong></div>
+    <div><span>Batch Number</span><strong>${esc(displayBatch || '—')}</strong></div>
     <div><span>Medicine Code</span><strong>${esc(code)}</strong></div>
     <div><span>Medicine</span><strong>${esc(name)}</strong></div>
     <div><span>Base Formula</span><strong>${esc(generated.formulaQuantity)} ${esc(generated.formulaUnit)}</strong></div>
@@ -524,7 +537,7 @@ export default function FormulaPage() {
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="foot">Computer-generated formula sheet — Uttam Laboratories</div>
+  <div class="foot">Computer-generated formula sheet — ${esc(displayFirm)}</div>
   <script>window.onload = () => window.print();</script>
 </body>
 </html>`;
@@ -537,27 +550,32 @@ export default function FormulaPage() {
   };
 
   const handleConsume = async () => {
-    if (generated && generated.sufficient === false) {
-      setMessage(generated.message || 'Cannot consume — insufficient herb stock');
-      return;
-    }
-    if (!confirm('This will deduct herb stock. Continue?')) return;
+    if (!generated?.items?.length) return;
+
+    const hasShortage = generated.sufficient === false || generated.items.some(it => it.sufficient === false);
+    const confirmMsg = hasShortage
+      ? 'Some herbs have insufficient stock and consuming will turn their stock negative. Continue?'
+      : 'This will deduct herb stock. Continue?';
+
+    if (!confirm(confirmMsg)) return;
+
     setGenerating(true);
     setMessage('');
     try {
-      const payload = {
-        medicineCodeId: parseInt(selectedMedicineCodeId, 10),
-        batchSize: toBatchSize(generateQuantity, generateUnit, baseFormulaUnit),
-      };
+      const batchSize = toBatchSize(generateQuantity, generateUnit, baseFormulaUnit);
+      const medicineCodeId = parseInt(selectedMedicineCodeId, 10);
+      const payload = { medicineCodeId, batchSize };
       const result = await formulasApi.consume(payload);
-      setMessage(`Consumed herbs: ${result.map(r => `${r.herbName}: ${r.consumed} ${r.unitOfMeasure || ''}`).join(', ')}`);
+      const summary = result.map(r => {
+        const rem = r.remainingStock < 0 ? ` (Remaining: ${r.remainingStock} ${r.stockUnit})` : '';
+        return `${r.herbName}: -${r.consumed} ${r.unitOfMeasure || ''}${rem}`;
+      }).join(', ');
+      setMessage(`Consumed herbs: ${summary}`);
       if (generated) {
-        const refreshed = await formulasApi.generate(payload);
+        const refreshed = await formulasApi.generate({ medicineCodeId, batchSize });
         setGenerated(refreshed);
-        if (!refreshed.sufficient) {
-          setMessage(prev => `${prev}. Warning: stock now insufficient for another batch.`);
-        }
       }
+      herbsApi.getAll().then(data => setHerbs(data)).catch(() => {});
     } catch (err) {
       setMessage(err.response?.data?.message || 'Consume failed');
     } finally {
@@ -770,13 +788,28 @@ export default function FormulaPage() {
                 ]}
               />
               <QtyUnitField
+                label="Generate Qty"
                 className="w-64"
                 quantity={generateQuantity}
                 unit={generateUnit}
                 onQuantityChange={e => setGenerateQuantity(e.target.value)}
                 onUnitChange={e => setGenerateUnit(e.target.value)}
               />
-              <Button onClick={handleGenerate} disabled={!selectedMedicineCodeId || !generateQuantity || generating}>
+              <Input
+                label="Batch Number"
+                placeholder="e.g. BAT-001"
+                value={batchNumber}
+                onChange={e => setBatchNumber(e.target.value)}
+                className="w-48"
+              />
+              <Input
+                label="Firm Name"
+                placeholder="e.g. Uttam Laboratories"
+                value={firmName}
+                onChange={e => setFirmName(e.target.value)}
+                className="w-56"
+              />
+              <Button onClick={handleGenerate} disabled={!selectedMedicineCodeId || !generateQuantity || !(parseFloat(generateQuantity) > 0) || generating}>
                 {generating ? 'Generating...' : 'Generate'}
               </Button>
             </div>
@@ -800,12 +833,16 @@ export default function FormulaPage() {
 
             {generated?.items?.length > 0 && (
               <>
-                <p className="text-sm text-muted">
-                  Scaled from {generated.formulaQuantity} {generated.formulaUnit} to {generateQuantity} {generateUnit}
-                  {generateUnit !== generated.formulaUnit ? ` (${generated.batchSize} ${generated.formulaUnit})` : ''}.
-                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                  <p>
+                    Scaled from {generated.formulaQuantity} {generated.formulaUnit} to {generateQuantity} {generateUnit}
+                    {generateUnit !== generated.formulaUnit ? ` (${generated.batchSize} ${generated.formulaUnit})` : ''}.
+                  </p>
+                  {batchNumber && <p>Batch: <strong className="text-ink">{batchNumber}</strong></p>}
+                  {firmName && <p>Firm: <strong className="text-ink">{firmName}</strong></p>}
+                </div>
                 <Table columns={generateColumns} data={generated.items} />
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap items-center">
                   <Button variant="secondary" onClick={handlePrintGenerated}>
                     <Printer className="w-4 h-4" /> Print
                   </Button>
@@ -813,7 +850,7 @@ export default function FormulaPage() {
                     <Button
                       variant="saffron"
                       onClick={handleConsume}
-                      disabled={generating || generated.sufficient === false}
+                      disabled={generating || saving}
                     >
                       Consume Herbs
                     </Button>

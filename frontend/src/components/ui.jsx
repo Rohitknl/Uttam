@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronDown } from 'lucide-react';
 
 export function Card({ children, className = '' }) {
   const hasBg = className.includes('bg-');
@@ -101,12 +102,12 @@ export function DropdownSelect({
     const place = () => {
       const rect = btnRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
-      const openUp = spaceBelow < 240 && rect.top > spaceBelow;
-      const maxHeight = Math.min(240, openUp ? rect.top - 12 : spaceBelow - 12);
+      const openUp = spaceBelow < 280 && rect.top > spaceBelow;
+      const maxHeight = Math.min(300, Math.max(120, openUp ? rect.top - 12 : spaceBelow - 12));
       setMenuStyle({
         position: 'fixed',
         left: rect.left,
-        width: Math.max(rect.width, 220),
+        width: Math.max(rect.width, 240),
         zIndex: 80,
         maxHeight,
         ...(openUp
@@ -148,15 +149,16 @@ export function DropdownSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(v => !v)}
-        className={`w-full px-3 py-2 rounded-lg border border-line bg-white text-left text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 disabled:opacity-60 ${error ? 'border-red-500' : ''}`}
+        className={`w-full px-3 py-2 rounded-lg border border-line bg-white text-left text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 disabled:opacity-60 flex items-center justify-between gap-2 ${error ? 'border-red-500' : ''}`}
       >
-        <span className={selected ? '' : 'text-muted'}>{display}</span>
+        <span className={`truncate ${selected ? '' : 'text-muted'}`}>{display}</span>
+        <ChevronDown className={`w-4 h-4 text-muted shrink-0 transition-transform duration-200 ${open ? 'rotate-180 text-forest-700' : ''}`} />
       </button>
       {open && createPortal(
         <div
           ref={menuRef}
           style={menuStyle}
-          className="flex flex-col overflow-hidden overscroll-contain rounded-lg border border-line bg-white shadow-lg"
+          className="flex flex-col overflow-hidden overscroll-contain rounded-lg border border-line bg-white shadow-xl animate-in fade-in-50 duration-150"
           onWheel={e => e.stopPropagation()}
         >
           {searchable && (
@@ -171,7 +173,7 @@ export function DropdownSelect({
               />
             </div>
           )}
-          <div className="overflow-y-auto flex-1 min-h-0">
+          <div className="overflow-y-auto flex-1 min-h-0 panel-scroll py-1">
             {filtered.length === 0 ? (
               <div className="px-3 py-2 text-sm text-muted">No matching options</div>
             ) : (
@@ -179,7 +181,7 @@ export function DropdownSelect({
                 <button
                   key={String(opt.value)}
                   type="button"
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-forest-100 ${String(opt.value) === String(value) ? 'bg-forest-100 text-forest-700 font-medium' : 'text-ink'}`}
+                  className={`w-full px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-forest-50 ${String(opt.value) === String(value) ? 'bg-forest-100 text-forest-800 font-semibold' : 'text-ink'}`}
                   onClick={() => {
                     onChange(opt.value);
                     setOpen(false);
@@ -197,6 +199,200 @@ export function DropdownSelect({
     </div>
   );
 }
+
+/** Searchable, free-text combobox with portalled dropdown suggestions */
+export function Combobox({
+  label,
+  error,
+  value = '',
+  onChange,
+  onBlur,
+  options = [],
+  placeholder = '',
+  className = '',
+  inputClassName = '',
+  disabled = false,
+  autoComplete = 'off',
+  ...props
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const rootRef = useRef(null);
+  const inputRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState({});
+
+  const valTrimmed = String(value ?? '').trim().toLowerCase();
+
+  // If the user's typed value exactly matches one option, or is empty, show all options.
+  // Otherwise, filter options that match the typed query.
+  const hasExactMatch = options.some(opt => {
+    const v = String(typeof opt === 'string' ? opt : (opt.value ?? opt.label)).trim().toLowerCase();
+    return v === valTrimmed;
+  });
+
+  const filtered = (!valTrimmed || hasExactMatch)
+    ? options
+    : options.filter(opt => {
+        const text = typeof opt === 'string' ? opt : (opt.label || opt.value || '');
+        return text.toLowerCase().includes(valTrimmed);
+      });
+
+  useEffect(() => {
+    if (!open || !inputRef.current) return undefined;
+
+    const place = () => {
+      if (!inputRef.current) return;
+      const rect = inputRef.current.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpen(false);
+        return;
+      }
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < 220 && rect.top > spaceBelow;
+      const maxHeight = Math.min(240, Math.max(100, openUp ? rect.top - 12 : spaceBelow - 12));
+      setMenuStyle({
+        position: 'fixed',
+        left: rect.left,
+        width: rect.width,
+        zIndex: 80,
+        maxHeight,
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+      });
+    };
+
+    place();
+    const onDoc = (e) => {
+      if (rootRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    document.addEventListener('mousedown', onDoc);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+      document.removeEventListener('mousedown', onDoc);
+    };
+  }, [open]);
+
+  const selectOption = (opt) => {
+    const val = typeof opt === 'string' ? opt : (opt.value ?? opt.label);
+    onChange(val);
+    setOpen(false);
+    setHighlightIndex(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Tab') {
+      setOpen(false);
+      return;
+    }
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      setOpen(true);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex(idx => (idx + 1 < filtered.length ? idx + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex(idx => (idx - 1 >= 0 ? idx - 1 : filtered.length - 1));
+    } else if (e.key === 'Enter') {
+      if (open && highlightIndex >= 0 && highlightIndex < filtered.length) {
+        e.preventDefault();
+        selectOption(filtered[highlightIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className={`relative ${className}`} ref={rootRef}>
+      {label && <label className="block text-sm font-medium text-ink mb-1">{label}</label>}
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={e => {
+            onChange(e.target.value);
+            if (!open) setOpen(true);
+            setHighlightIndex(-1);
+          }}
+          onFocus={() => {
+            if (options.length > 0) setOpen(true);
+          }}
+          onBlur={onBlur}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoComplete={autoComplete}
+          className={`w-full px-3 py-2 pr-9 rounded-lg border border-line bg-white text-ink text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 transition-colors ${error ? 'border-red-500' : ''} ${inputClassName}`}
+          {...props}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          disabled={disabled}
+          onClick={() => {
+            setOpen(v => !v);
+            inputRef.current?.focus();
+          }}
+          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-muted hover:text-ink focus:outline-none disabled:opacity-50"
+          title="Toggle dropdown"
+        >
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${open ? 'rotate-180 text-forest-700' : ''}`} />
+        </button>
+      </div>
+      {open && filtered.length > 0 && (
+        createPortal(
+          <div
+            ref={menuRef}
+            style={menuStyle}
+            className="flex flex-col overflow-hidden overscroll-contain rounded-lg border border-line bg-white shadow-lg animate-in fade-in-50 duration-150"
+            onWheel={e => e.stopPropagation()}
+            onMouseDown={e => e.preventDefault()}
+          >
+            <div className="overflow-y-auto flex-1 min-h-0 panel-scroll py-1">
+              {filtered.map((opt, idx) => {
+                const optVal = typeof opt === 'string' ? opt : (opt.value ?? opt.label);
+                const optLabel = typeof opt === 'string' ? opt : opt.label;
+                const isSelected = String(optVal).trim().toLowerCase() === valTrimmed;
+                const isHighlighted = idx === highlightIndex;
+
+                return (
+                  <button
+                    key={`${optVal}-${idx}`}
+                    type="button"
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                      isSelected
+                        ? 'bg-forest-100 text-forest-800 font-semibold'
+                        : isHighlighted
+                          ? 'bg-forest-50 text-ink'
+                          : 'text-ink hover:bg-forest-50'
+                    }`}
+                    onMouseEnter={() => setHighlightIndex(idx)}
+                    onClick={() => selectOption(opt)}
+                  >
+                    {optLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body,
+        )
+      )}
+      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+  );
+}
+
 
 /** Table panel with a constant horizontal scrollbar pinned to the bottom edge */
 export function StickyHScroll({ children, className = '' }) {
