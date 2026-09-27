@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(
+  process.env.DATABASE_URL
+    ? { datasources: { db: { url: process.env.DATABASE_URL } } }
+    : undefined
+);
 
 async function main() {
   console.log('Cleaning all application data...');

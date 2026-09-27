@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { DatabaseBackup, Download, Upload, RefreshCw, FolderOpen, FileSearch } from 'lucide-react';
+import { DatabaseBackup, Download, Upload, RefreshCw, FolderOpen, FileSearch, RotateCcw } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Select, Input, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -16,6 +16,7 @@ export default function BackupPage() {
   const [customRestoreFile, setCustomRestoreFile] = useState('');
   const [backupPassword, setBackupPassword] = useState('');
   const [restorePassword, setRestorePassword] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -200,6 +201,29 @@ export default function BackupPage() {
     }
   };
 
+  const handleResetEmpty = async () => {
+    if (!resetPassword.trim()) {
+      setError('Enter Edit/Delete Herb Password to reset all application data');
+      return;
+    }
+    if (!confirm('Are you sure you want to reset all data to empty?\\n\\nThis will delete all herbs, medicines, supplier bills, and orders. A safety backup will be automatically saved under _pre_reset.')) {
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    setError('');
+    try {
+      const result = await backupApi.resetEmpty(resetPassword);
+      setMessage(result.message);
+      setResetPassword('');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Reset failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <Layout>
@@ -368,6 +392,41 @@ export default function BackupPage() {
               <Upload className="w-4 h-4 mr-2" />
               {busy ? 'Restoring...' : 'Restore Selected Backup'}
             </Button>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* RESET TO EMPTY DATA CARD */}
+      <div className="mt-6">
+        <Card className="border-red-200 bg-red-50/20">
+          <CardBody className="space-y-4">
+            <div className="flex items-center gap-2 text-red-700 font-semibold text-lg">
+              <RotateCcw className="w-5 h-5" />
+              Reset Database to Empty State
+            </div>
+            <p className="text-sm text-gray-600">
+              Clear all raw herbs, medicines, supplier bills, formulas, and orders. A safety backup will be saved automatically before clearing.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1 w-full">
+                <Input
+                  label="Edit/Delete Herb Password"
+                  type="password"
+                  value={resetPassword}
+                  onChange={e => setResetPassword(e.target.value)}
+                  placeholder="Required to reset database"
+                />
+              </div>
+              <Button
+                variant="danger"
+                onClick={handleResetEmpty}
+                disabled={busy || !resetPassword.trim()}
+                className="whitespace-nowrap"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {busy ? 'Resetting...' : 'Reset All Data to Empty'}
+              </Button>
+            </div>
           </CardBody>
         </Card>
       </div>

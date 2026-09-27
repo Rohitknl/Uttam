@@ -36,4 +36,8 @@ router.post('/restore', requireHerbCodeCrudPassword, asyncHandler(async (req, re
   res.json(await backupService.restoreBackup(destinationId, fileName));
 }));
 
+router.post('/reset-empty', requireHerbCodeCrudPassword, asyncHandler(async (_req, res) => {
+  res.json(await backupService.resetDatabaseToEmpty());
+}));
+
 export default router;

@@ -36,6 +36,7 @@
           "src/**/*",
           "prisma/schema.prisma",
           "prisma/template.db",
+          "credentials.json",
           "node_modules/**/*"
         ]
       },

@@ -24,7 +24,9 @@ import { hashPassword } from './bcrypt.js';
 
 // Resolve credentials.json to the backend root directory (two levels up from src/utils/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CREDENTIALS_PATH = path.resolve(__dirname, '..', '..', 'credentials.json');
+const CREDENTIALS_PATH = process.env.CREDENTIALS_PATH
+  ? path.resolve(process.env.CREDENTIALS_PATH)
+  : path.resolve(__dirname, '..', '..', 'credentials.json');
 
 const DEFAULT_USERNAME = 'admin';
 const DEFAULT_PASSWORD = 'admin123';

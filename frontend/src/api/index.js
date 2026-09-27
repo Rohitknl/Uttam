@@ -108,6 +108,7 @@ export const backupApi = {
   list: (destinationId) => client.get('/backup/list', { params: { destinationId } }).then(r => r.data),
   create: (destinationId, crudPassword) => client.post('/backup/create', { destinationId, crudPassword }).then(r => r.data),
   restore: (destinationId, fileName, crudPassword) => client.post('/backup/restore', { destinationId, fileName, crudPassword }).then(r => r.data),
+  resetEmpty: (crudPassword) => client.post('/backup/reset-empty', { crudPassword }).then(r => r.data),
 };
 
 export const settingsApi = {

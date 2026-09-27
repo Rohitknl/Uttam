@@ -1374,6 +1374,69 @@ export async function restoreBackup(
 
 /*
  * ============================================================
+ * RESET DATABASE TO EMPTY
+ * ============================================================
+ *
+ * Clears all business data (herbs, bills, medicines, orders,
+ * batches, codes) and keeps only the admin account.
+ * Automatically saves a safety backup before resetting.
+ * ============================================================
+ */
+export async function resetDatabaseToEmpty() {
+  const dbPath = getDbPath();
+  if (!fs.existsSync(dbPath)) {
+    throw new AppError('Database file not found', 404);
+  }
+
+  // 1. Create a safety backup in _pre_reset directory
+  const defaultDest = getAvailableDrives()[0];
+  const targetDir = defaultDest ? defaultDest.path : path.dirname(dbPath);
+  const safetyDir = path.join(targetDir, '_pre_reset');
+  ensureDir(safetyDir);
+  const safetyName = `pre-reset-${timestampName()}`;
+  const safetyPath = path.join(safetyDir, safetyName);
+
+  try {
+    const escapedSafetyPath = safetyPath.replace(/\\/g, '/').replace(/'/g, "''");
+    await prisma.$executeRawUnsafe(`VACUUM INTO '${escapedSafetyPath}';`);
+  } catch {
+    try {
+      fs.copyFileSync(dbPath, safetyPath);
+    } catch (copyErr) {
+      console.warn('Could not create pre-reset safety copy:', copyErr.message);
+    }
+  }
+
+  // 2. Clear all business data tables in dependency order inside a transaction
+  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.orderItem.deleteMany();
+      await tx.order.deleteMany();
+      await tx.batch.deleteMany();
+      await tx.productionBatch.deleteMany();
+      await tx.recipeItem.deleteMany();
+      await tx.supplierBillLine.deleteMany();
+      await tx.herbPurchase.deleteMany();
+      await tx.supplierBill.deleteMany();
+      await tx.medicine.deleteMany();
+      await tx.herb.deleteMany();
+      await tx.medicineCode.deleteMany();
+      await tx.herbCode.deleteMany();
+      await tx.seller.deleteMany();
+    });
+  } finally {
+    await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;');
+  }
+
+  return {
+    message: 'All application data cleared successfully. Database is now empty.',
+    safetyBackup: safetyPath,
+  };
+}
+
+/*
+ * ============================================================
  * OPTIONAL HELPER
  * ============================================================
  *

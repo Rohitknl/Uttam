@@ -4,9 +4,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
-try {
-  fs.appendFileSync('C:\\Users\\yogit\\Downloads\\Uttam-master\\debug.log', `[${new Date().toISOString()}] main.cjs evaluated: ${process.argv.join(' ')}\n`);
-} catch (e) {}
+
 
 ipcMain.handle('dialog:select-folder', async () => {
   if (!mainWindow) return null;
@@ -77,24 +75,125 @@ function toPrismaFileUrl(filePath) {
   return `file:${filePath.replace(/\\/g, '/')}`;
 }
 
-function ensureDatabase() {
-  const dbPath = getDbFilePath();
-  if (fs.existsSync(dbPath)) return dbPath;
+function getCredentialsFilePath() {
+  return path.join(getDataDir(), 'credentials.json');
+}
 
-  const candidates = [
-    path.join(getBackendRoot(), 'prisma', 'template.db'),
-    path.join(getBackendRoot(), 'prisma', 'dev.db'),
-  ];
+function ensureCredentials() {
+  const credPath = getCredentialsFilePath();
+  if (fs.existsSync(credPath)) return credPath;
 
-  for (const source of candidates) {
-    if (fs.existsSync(source)) {
-      fs.copyFileSync(source, dbPath);
-      return dbPath;
+  const templateCred = path.join(getBackendRoot(), 'credentials.json');
+  if (fs.existsSync(templateCred)) {
+    try {
+      fs.copyFileSync(templateCred, credPath);
+      return credPath;
+    } catch {}
+  }
+  return credPath;
+}
+
+const DB_CLEAN_VERSION_MARKER = 'v1.1.0-clean-init';
+
+function cleanAndResetDatabase(targetDbPath, templateDb, reason) {
+  log(`[DB AUTO-CLEAN] Cleaning database at "${targetDbPath}". Reason: ${reason}`);
+
+  if (fs.existsSync(targetDbPath)) {
+    try {
+      const dataDir = path.dirname(targetDbPath);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupName = `safety-backup-old-db-${timestamp}.db`;
+      const backupPath = path.join(dataDir, backupName);
+      fs.copyFileSync(targetDbPath, backupPath);
+      log(`[DB AUTO-CLEAN] Saved safety backup to: ${backupPath}`);
+
+      // Also copy safety backup to Documents/UttamLab/Backups if accessible
+      try {
+        const docsBackupDir = path.join(app.getPath('documents'), 'UttamLab', 'Backups');
+        fs.mkdirSync(docsBackupDir, { recursive: true });
+        fs.copyFileSync(targetDbPath, path.join(docsBackupDir, backupName));
+        log(`[DB AUTO-CLEAN] Saved safety backup in Documents: ${path.join(docsBackupDir, backupName)}`);
+      } catch {}
+    } catch (err) {
+      log(`[DB AUTO-CLEAN] Warning saving backup: ${err.message}`);
+    }
+
+    // Clean sidecar files
+    for (const suffix of ['-wal', '-shm', '-journal']) {
+      const side = `${targetDbPath}${suffix}`;
+      if (fs.existsSync(side)) {
+        try { fs.unlinkSync(side); } catch {}
+      }
     }
   }
 
-  // Empty file; Prisma will need schema already applied via template in normal builds
-  fs.writeFileSync(dbPath, '');
+  if (fs.existsSync(templateDb)) {
+    fs.copyFileSync(templateDb, targetDbPath);
+    log(`[DB AUTO-CLEAN] Copied fresh, clean template.db to: ${targetDbPath}`);
+  } else {
+    fs.writeFileSync(targetDbPath, '');
+  }
+}
+
+function ensureDatabase() {
+  const dataDir = getDataDir();
+  const dbPath = getDbFilePath();
+  const markerFile = path.join(dataDir, '.db_initialized_clean');
+  const templateDb = path.join(getBackendRoot(), 'prisma', 'template.db');
+
+  let needsClean = false;
+  let cleanReason = '';
+
+  // 1. Force clean via command line flags (--clean or --reset-db)
+  if (process.argv.includes('--clean') || process.argv.includes('--reset-db')) {
+    needsClean = true;
+    cleanReason = 'Command-line flag (--clean or --reset-db) specified';
+  }
+  // 2. If an existing database file is present without the clean initialization marker
+  else if (fs.existsSync(dbPath) && (!fs.existsSync(markerFile) || fs.readFileSync(markerFile, 'utf8').trim() !== DB_CLEAN_VERSION_MARKER)) {
+    needsClean = true;
+    cleanReason = 'Found existing database from older/uncleaned version without clean marker';
+  }
+
+  // Also check and clean alternative appData locations if present
+  try {
+    const roaming = app.getPath('appData');
+    const altFolders = ['Uttam Laboratory', 'uttam-laboratory'];
+    for (const folder of altFolders) {
+      const altDataDir = path.join(roaming, folder, 'data');
+      const altDb = path.join(altDataDir, 'uttam.db');
+      const altMarker = path.join(altDataDir, '.db_initialized_clean');
+      if (altDb !== dbPath && fs.existsSync(altDb) && (!fs.existsSync(altMarker) || fs.readFileSync(altMarker, 'utf8').trim() !== DB_CLEAN_VERSION_MARKER)) {
+        cleanAndResetDatabase(altDb, templateDb, `Found existing legacy db in ${folder}`);
+        try { fs.writeFileSync(altMarker, DB_CLEAN_VERSION_MARKER, 'utf8'); } catch {}
+      }
+    }
+  } catch (e) {
+    log(`[DB AUTO-CLEAN] Alternative folder scan warning: ${e.message}`);
+  }
+
+  if (needsClean) {
+    cleanAndResetDatabase(dbPath, templateDb, cleanReason);
+    try {
+      fs.writeFileSync(markerFile, DB_CLEAN_VERSION_MARKER, 'utf8');
+    } catch {}
+    return dbPath;
+  }
+
+  // Initial setup if db does not exist
+  if (!fs.existsSync(dbPath)) {
+    if (fs.existsSync(templateDb)) {
+      fs.copyFileSync(templateDb, dbPath);
+    } else {
+      fs.writeFileSync(dbPath, '');
+    }
+    try {
+      fs.writeFileSync(markerFile, DB_CLEAN_VERSION_MARKER, 'utf8');
+    } catch {}
+    log(`[DB INIT] Initialized clean database from template`);
+    return dbPath;
+  }
+
   return dbPath;
 }
 
@@ -102,9 +201,6 @@ function log(...args) {
   try {
     const logFile = path.join(getDataDir(), 'app.log');
     fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${args.join(' ')}\n`);
-  } catch {}
-  try {
-    fs.appendFileSync('C:\\Users\\yogit\\Downloads\\Uttam-master\\debug.log', `[${new Date().toISOString()}] ${args.join(' ')}\n`);
   } catch {}
   console.log(...args);
 }
@@ -166,12 +262,14 @@ function startBackend() {
     throw new Error(`Frontend build not found: ${staticDir}. Run frontend build first.`);
   }
 
+  const credPath = ensureCredentials();
   const env = {
     ...process.env,
     ELECTRON_RUN_AS_NODE: '1',
     PORT: String(DESKTOP_PORT),
     HOST,
     DATABASE_URL: toPrismaFileUrl(dbPath),
+    CREDENTIALS_PATH: credPath,
     STATIC_DIR: staticDir,
     CORS_ORIGINS: `http://${HOST}:${DESKTOP_PORT}`,
     JWT_SECRET: process.env.JWT_SECRET || 'UttamLifecycleAyurvedaInventorySecretKey2024MustBeAtLeast256BitsLongForHS256',

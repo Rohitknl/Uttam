@@ -48,31 +48,30 @@ if (genResult.status !== 0) {
   }
 }
 
-const devDb = path.join(backend, 'prisma', 'dev.db');
-
+console.log('Preparing clean, empty SQLite template database for desktop distribution...');
 for (const suffix of ['', '-wal', '-shm', '-journal']) {
   const p = `${templateDb}${suffix}`;
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }
 
-if (fs.existsSync(devDb)) {
-  console.log('Copying working dev.db to template.db so exact database state is shipped with Electron...');
-  fs.copyFileSync(devDb, templateDb);
-} else {
-  console.log('Preparing SQLite template database...');
-  const templateUrl = 'file:./template.db';
-  run('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], backend, {
-    DATABASE_URL: templateUrl,
-  });
-  run('node', ['seeds/clean.js'], backend, {
-    DATABASE_URL: templateUrl,
-  });
-}
+const templateUrl = `file:${path.resolve(templateDb).replace(/\\/g, '/')}`;
+console.log(`Pushing schema to template database: ${templateUrl}`);
+run('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], backend, {
+  DATABASE_URL: templateUrl,
+});
+
+console.log('Seeding initial clean state (default admin only, 0 inventory/bills/medicines)...');
+run('node', ['seeds/clean.js'], backend, {
+  DATABASE_URL: templateUrl,
+});
 
 if (!fs.existsSync(templateDb)) {
   console.error('Expected backend/prisma/template.db after prepare');
   process.exit(1);
 }
 
-console.log(`Template DB ready: ${templateDb}`);
+console.log('Verifying template.db contains ZERO pre-filled data...');
+run('node', ['scripts/verify-empty-db.mjs', templateDb], root);
+
+console.log(`Template DB ready and verified empty: ${templateDb}`);
 console.log('Desktop prepare complete.');

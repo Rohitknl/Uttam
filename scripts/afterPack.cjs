@@ -51,6 +51,13 @@ exports.default = async function afterPack(context) {
     console.log('afterPack: copied template.db');
   }
 
+  const credsSrc = path.join(root, 'backend', 'credentials.json');
+  const credsDest = path.join(backendDest, 'credentials.json');
+  if (fs.existsSync(credsSrc)) {
+    fs.copyFileSync(credsSrc, credsDest);
+    console.log('afterPack: copied credentials.json');
+  }
+
   const engine = path.join(modulesDest, '.prisma', 'client', 'query_engine-windows.dll.node');
   if (!fs.existsSync(engine)) {
     throw new Error(`Prisma Windows engine missing after copy: ${engine}`);
