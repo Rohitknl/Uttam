@@ -200,7 +200,7 @@ export default function FormulaPage() {
     view: 'View Formula',
     edit: 'Add / Edit Formula',
     delete: 'Delete Formula',
-    print: 'Print Formula',
+    print: 'Generate/Print Formula',
   };
 
   const CATEGORY_DESCRIPTIONS = {
@@ -1606,7 +1606,7 @@ export default function FormulaPage() {
                 className="w-56"
               />
               <Button onClick={handleGenerate} disabled={!selectedMedicineCodeId || !generateQuantity || !(parseFloat(generateQuantity) > 0) || generating}>
-                {generating ? 'Generating...' : 'Calculate Sheet'}
+                {generating ? 'Generating...' : 'Generate'}
               </Button>
             </div>
 

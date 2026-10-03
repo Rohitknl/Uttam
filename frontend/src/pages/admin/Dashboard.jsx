@@ -63,10 +63,12 @@ function printList(title, rowsHtml) {
   <script>window.onload = () => { window.print(); };</script>
 </body>
 </html>`;
-  const w = window.open('', '_blank');
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank');
+  URL.revokeObjectURL(url);
   if (!w) return;
-  w.document.write(html);
-  w.document.close();
+  w.focus();
 }
 
 function buildPrintRows(type, items) {
