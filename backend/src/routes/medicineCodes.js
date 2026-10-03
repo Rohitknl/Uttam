@@ -43,6 +43,10 @@ router.put('/:id/recipe', authenticate, requireAdmin, asyncHandler(async (req, r
   res.json(await recipeService.updateRecipeByMedicineCodeId(parseInt(req.params.id), data));
 }));
 
+router.delete('/:id/recipe', authenticate, requireAdmin, asyncHandler(async (req, res) => {
+  res.json(await recipeService.deleteRecipeByMedicineCodeId(parseInt(req.params.id)));
+}));
+
 router.get('/:id', authenticate, requireAdminOrViewer, asyncHandler(async (req, res) => {
 
   res.json(await codeService.getMedicineCodeById(parseInt(req.params.id)));

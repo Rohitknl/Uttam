@@ -98,11 +98,16 @@ export async function deleteHerbCode(id) {
 
 async function enrichMedicineCode(code, linkedMedicines) {
   const linked = linkedMedicines.find(m => m.medicineCodeId === code.id);
+  const recipeItemsCount = code._count?.recipeItems ?? (code.recipeItems ? code.recipeItems.length : 0);
   return {
     id: code.id,
     code: code.code,
     name: code.name,
     description: code.description,
+    formulaQuantity: code.formulaQuantity,
+    formulaUnit: code.formulaUnit,
+    hasRecipe: recipeItemsCount > 0,
+    recipeItemsCount,
     active: code.active,
     assigned: !!linked,
     linkedItemName: linked?.name || null,
@@ -119,6 +124,11 @@ export async function getAllMedicineCodes(search) {
         { name: { contains: search } },
       ],
     } : undefined,
+    include: {
+      _count: {
+        select: { recipeItems: true },
+      },
+    },
     orderBy: { code: 'asc' },
   });
   const medicines = await prisma.medicine.findMany({ where: { medicineCodeId: { not: null } } });
@@ -137,7 +147,14 @@ export async function getAvailableMedicineCodes() {
 }
 
 export async function getMedicineCodeById(id) {
-  const code = await prisma.medicineCode.findUnique({ where: { id } });
+  const code = await prisma.medicineCode.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: { recipeItems: true },
+      },
+    },
+  });
   if (!code) throw new AppError('Medicine code not found', 404);
   const medicines = await prisma.medicine.findMany({ where: { medicineCodeId: id } });
   return enrichMedicineCode(code, medicines);

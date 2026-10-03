@@ -46,6 +46,7 @@ export const medicineCodesApi = {
   getById: (id) => client.get(`/medicine-codes/${id}`).then(r => r.data),
   getRecipe: (id) => client.get(`/medicine-codes/${id}/recipe`).then(r => r.data),
   updateRecipe: (id, data) => client.put(`/medicine-codes/${id}/recipe`, data).then(r => r.data),
+  deleteRecipe: (id) => client.delete(`/medicine-codes/${id}/recipe`).then(r => r.data),
   create: (data) => client.post('/medicine-codes', data).then(r => r.data),
   update: (id, data) => client.put(`/medicine-codes/${id}`, data).then(r => r.data),
   delete: (id, data) => client.delete(`/medicine-codes/${id}`, { data }).then(r => r.data),

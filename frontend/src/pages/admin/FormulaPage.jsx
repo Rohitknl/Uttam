@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer } from 'lucide-react';
+import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -146,7 +146,10 @@ function sumHerbQuantityInUnit(recipeItems, herbsList, medicineUnit) {
 export default function FormulaPage() {
   const { canWrite, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'generate' ? 'generate' : 'define';
+  const tabParam = searchParams.get('tab');
+  const activeTab = ['view', 'edit', 'delete', 'print'].includes(tabParam)
+    ? tabParam
+    : (tabParam === 'define' ? 'edit' : (tabParam === 'generate' ? 'print' : 'view'));
 
   const [medicineOptions, setMedicineOptions] = useState([]);
   const [herbs, setHerbs] = useState([]);
@@ -156,6 +159,7 @@ export default function FormulaPage() {
   const [formulaUnit, setFormulaUnit] = useState('PIECES');
   const [description, setDescription] = useState('');
   const [recipe, setRecipe] = useState([]);
+  const [hasRecipe, setHasRecipe] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -168,10 +172,11 @@ export default function FormulaPage() {
   const [baseFormulaUnit, setBaseFormulaUnit] = useState('PIECES');
   const [batchNumber, setBatchNumber] = useState('');
   const [firmName, setFirmName] = useState('');
+  const [overviewSearch, setOverviewSearch] = useState('');
 
   const setActiveTab = (tab) => {
-    if (tab === 'define') setSearchParams({});
-    else setSearchParams({ tab: 'generate' });
+    setMessage('');
+    setSearchParams(tab === 'view' ? {} : { tab });
   };
 
   const buildOptions = (codes) => codes
@@ -181,7 +186,12 @@ export default function FormulaPage() {
       code: c.code,
       name: c.name,
       description: c.description || '',
+      formulaQuantity: c.formulaQuantity ?? 1,
       formulaUnit: c.formulaUnit || 'PIECES',
+      hasRecipe: !!c.hasRecipe,
+      recipeItemsCount: c.recipeItemsCount || 0,
+      assigned: c.assigned,
+      linkedItemName: c.linkedItemName,
     }))
     .sort((a, b) => String(a.code).localeCompare(String(b.code)));
 
@@ -228,60 +238,74 @@ export default function FormulaPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedMedicineCodeId && activeTab === 'define') {
-      medicineCodesApi.getRecipe(selectedMedicineCodeId)
-        .then(data => {
-          setFormulaQuantity(String(data.formulaQuantity ?? 1));
-          setFormulaUnit(data.formulaUnit || 'PIECES');
-          setDescription(data.description || '');
-          setRecipe((data.items || []).map(r => {
-            const herb = herbs.find(h => h.id === r.herbId);
-            const opt = herbOptions.find(o => o.herbId === r.herbId)
-              || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
-            return {
-              herbId: String(r.herbId),
-              herbCodeId: opt ? String(opt.herbCodeId) : (herb?.herbCodeId ? String(herb.herbCodeId) : ''),
-              quantity: String(r.quantity ?? ''),
-              unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
-            };
-          }));
-        })
-        .catch(() => {
-          const opt = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
-          setFormulaQuantity('1');
-          setFormulaUnit(opt?.formulaUnit || 'PIECES');
-          setDescription(opt?.description || '');
-          setRecipe([]);
-        });
-    } else if (selectedMedicineCodeId && activeTab === 'generate') {
-      medicineCodesApi.getRecipe(selectedMedicineCodeId)
-        .then(data => {
-          const unit = data.formulaUnit || 'PIECES';
-          setBaseFormulaQuantity(data.formulaQuantity ?? 1);
-          setBaseFormulaUnit(unit);
-          setGenerateUnit(unit);
-          setDescription(data.description || '');
-          if (!generateQuantity) setGenerateQuantity(String(data.formulaQuantity ?? 1));
-        })
-        .catch(() => {
-          const opt = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
-          const unit = opt?.formulaUnit || 'PIECES';
-          setBaseFormulaQuantity(1);
-          setBaseFormulaUnit(unit);
-          setGenerateUnit(unit);
-          setDescription(opt?.description || '');
-        });
-    } else if (!selectedMedicineCodeId) {
+    if (!selectedMedicineCodeId) {
       setFormulaQuantity('1');
       setFormulaUnit('PIECES');
       setDescription('');
       setRecipe([]);
+      setHasRecipe(false);
       setGenerateQuantity('');
       setGenerateUnit('PIECES');
       setBaseFormulaQuantity(1);
       setBaseFormulaUnit('PIECES');
+      setGenerated(null);
+      return;
     }
-  }, [selectedMedicineCodeId, medicineOptions, activeTab]);
+
+    medicineCodesApi.getRecipe(selectedMedicineCodeId)
+      .then(data => {
+        const items = data.items || [];
+        setHasRecipe(items.length > 0);
+        setFormulaQuantity(String(data.formulaQuantity ?? 1));
+        const unit = data.formulaUnit || 'PIECES';
+        setFormulaUnit(unit);
+        setDescription(data.description || '');
+        setBaseFormulaQuantity(data.formulaQuantity ?? 1);
+        setBaseFormulaUnit(unit);
+        setGenerateUnit(unit);
+        setGenerateQuantity(String(data.formulaQuantity ?? 1));
+        setRecipe(items.map(r => {
+          const herb = herbs.find(h => h.id === r.herbId);
+          const opt = herbOptions.find(o => o.herbId === r.herbId)
+            || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
+          return {
+            herbId: String(r.herbId),
+            herbCodeId: opt ? String(opt.herbCodeId) : (herb?.herbCodeId ? String(herb.herbCodeId) : ''),
+            herbName: r.herbName || herb?.name || opt?.name || '',
+            quantity: String(r.quantity ?? ''),
+            unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
+          };
+        }));
+      })
+      .catch(() => {
+        const opt = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
+        setHasRecipe(false);
+        setFormulaQuantity('1');
+        const unit = opt?.formulaUnit || 'PIECES';
+        setFormulaUnit(unit);
+        setDescription(opt?.description || '');
+        setBaseFormulaQuantity(1);
+        setBaseFormulaUnit(unit);
+        setGenerateUnit(unit);
+        setGenerateQuantity('1');
+        setRecipe([]);
+      });
+  }, [selectedMedicineCodeId, herbs, herbOptions, medicineOptions]);
+
+  useEffect(() => {
+    if (activeTab === 'print' && selectedMedicineCodeId && hasRecipe && !generating) {
+      const qty = generateQuantity || String(baseFormulaQuantity || 1);
+      const batchSize = toBatchSize(qty, generateUnit, baseFormulaUnit);
+      if (batchSize > 0) {
+        formulasApi.generate({
+          medicineCodeId: parseInt(selectedMedicineCodeId, 10),
+          batchSize,
+        })
+          .then(res => setGenerated(res))
+          .catch(() => setGenerated(null));
+      }
+    }
+  }, [activeTab, selectedMedicineCodeId, hasRecipe, generateQuantity, generateUnit, baseFormulaQuantity, baseFormulaUnit]);
 
   const selectMedicineCode = (medicineCodeId) => {
     setMessage('');
@@ -447,14 +471,51 @@ export default function FormulaPage() {
         description: description ? description.trim() : '',
         items,
       });
+      setHasRecipe(true);
       setMedicineOptions(prev => prev.map(m => (
         String(m.medicineCodeId) === String(selectedMedicineCodeId)
-          ? { ...m, description: description ? description.trim() : '' }
+          ? {
+              ...m,
+              description: description ? description.trim() : '',
+              formulaQuantity: medQty,
+              formulaUnit,
+              hasRecipe: true,
+              recipeItemsCount: items.length,
+            }
           : m
       )));
       setMessage('Formula saved successfully');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteFormula = async () => {
+    if (!selectedMedicineCodeId) return;
+    const selected = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
+    const medName = selected ? `${selected.code} — ${selected.name}` : 'this medicine';
+
+    if (!window.confirm(`Are you sure you want to delete the formula for ${medName}?\n\nThis will remove all ingredients from the formula. The medicine code itself will not be deleted.`)) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+    try {
+      await medicineCodesApi.deleteRecipe(selectedMedicineCodeId);
+      setRecipe([]);
+      setHasRecipe(false);
+      setGenerated(null);
+      setMedicineOptions(prev => prev.map(m => (
+        String(m.medicineCodeId) === String(selectedMedicineCodeId)
+          ? { ...m, hasRecipe: false, recipeItemsCount: 0 }
+          : m
+      )));
+      setMessage(`Formula for ${medName} has been deleted successfully.`);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Failed to delete formula');
     } finally {
       setSaving(false);
     }
@@ -598,6 +659,205 @@ export default function FormulaPage() {
     }
   };
 
+  const selectedMedicine = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
+
+  const filteredMedicines = medicineOptions.filter(m => {
+    if (!overviewSearch.trim()) return true;
+    const q = overviewSearch.toLowerCase().trim();
+    return m.code.toLowerCase().includes(q) || m.name.toLowerCase().includes(q);
+  });
+
+  const viewColumns = [
+    {
+      key: 'index',
+      label: '#',
+      render: (_, __, idx) => <span className="text-muted font-mono">{idx + 1}</span>,
+    },
+    {
+      key: 'herbName',
+      label: 'Herb',
+      render: r => {
+        const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId));
+        const herb = herbs.find(h => h.id === parseInt(r.herbId, 10));
+        const code = opt?.code || herb?.herbCode;
+        const name = r.herbName || herb?.name || opt?.name || 'Herb';
+        return (
+          <div>
+            <div className="font-medium text-ink">{name}</div>
+            {code && <div className="text-xs text-muted">Code: {code}</div>}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'quantity',
+      label: 'Qty in Base Formula',
+      render: r => (
+        <span className="font-semibold text-forest-800">
+          {r.quantity} {r.unit}
+        </span>
+      ),
+    },
+    {
+      key: 'stock',
+      label: 'Current Available Stock',
+      render: r => {
+        const herb = herbs.find(h => h.id === parseInt(r.herbId, 10));
+        const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId));
+        const stock = herb?.currentStock ?? opt?.stock ?? 0;
+        const stockUnit = herb?.unitOfMeasure ?? opt?.unit ?? r.unit;
+        return (
+          <Badge variant={stock > 0 ? 'success' : 'danger'}>
+            {stock} {stockUnit}
+          </Badge>
+        );
+      },
+    },
+  ];
+
+  const overviewColumns = [
+    {
+      key: 'code',
+      label: 'Code',
+      render: m => <span className="font-mono font-medium text-ink">{m.code}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Medicine Name',
+      render: m => (
+        <div>
+          <span className="font-medium text-ink">{m.name}</span>
+          {m.description && <div className="text-xs text-muted line-clamp-1">{m.description}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'baseFormula',
+      label: 'Base Formula',
+      render: m => `${m.formulaQuantity ?? 1} ${m.formulaUnit || 'PIECES'}`,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: m => (m.hasRecipe ? (
+        <Badge variant="success">Defined ({m.recipeItemsCount} herbs)</Badge>
+      ) : (
+        <Badge variant="neutral">Not Configured</Badge>
+      )),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: m => (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => selectMedicineCode(m.medicineCodeId)}
+          >
+            <Eye className="w-3.5 h-3.5" /> View
+          </Button>
+          {canWrite && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                selectMedicineCode(m.medicineCodeId);
+                setActiveTab('edit');
+              }}
+            >
+              <Edit3 className="w-3.5 h-3.5" /> Edit
+            </Button>
+          )}
+          {m.hasRecipe && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                selectMedicineCode(m.medicineCodeId);
+                setActiveTab('print');
+              }}
+            >
+              <Printer className="w-3.5 h-3.5" /> Print
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const deleteOverviewColumns = [
+    {
+      key: 'code',
+      label: 'Code',
+      render: m => <span className="font-mono font-medium text-ink">{m.code}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Medicine Name',
+      render: m => <span className="font-medium text-ink">{m.name}</span>,
+    },
+    {
+      key: 'baseFormula',
+      label: 'Base Formula',
+      render: m => `${m.formulaQuantity ?? 1} ${m.formulaUnit || 'PIECES'}`,
+    },
+    {
+      key: 'herbs',
+      label: 'Ingredients',
+      render: m => <Badge variant="neutral">{m.recipeItemsCount} herbs</Badge>,
+    },
+    {
+      key: 'actions',
+      label: 'Action',
+      render: m => (
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={() => selectMedicineCode(m.medicineCodeId)}
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Select to Delete
+        </Button>
+      ),
+    },
+  ];
+
+  const printOverviewColumns = [
+    {
+      key: 'code',
+      label: 'Code',
+      render: m => <span className="font-mono font-medium text-ink">{m.code}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Medicine Name',
+      render: m => <span className="font-medium text-ink">{m.name}</span>,
+    },
+    {
+      key: 'baseFormula',
+      label: 'Base Formula',
+      render: m => `${m.formulaQuantity ?? 1} ${m.formulaUnit || 'PIECES'}`,
+    },
+    {
+      key: 'herbs',
+      label: 'Ingredients',
+      render: m => <Badge variant="neutral">{m.recipeItemsCount} herbs</Badge>,
+    },
+    {
+      key: 'actions',
+      label: 'Action',
+      render: m => (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => selectMedicineCode(m.medicineCodeId)}
+        >
+          <Printer className="w-3.5 h-3.5" /> Select &amp; Print
+        </Button>
+      ),
+    },
+  ];
+
   const generateColumns = [
     { key: 'herbName', label: 'Herb' },
     { key: 'quantityPerUnit', label: 'Qty / Base', render: r => `${r.quantityPerUnit} ${r.unitOfMeasure || ''}` },
@@ -631,32 +891,221 @@ export default function FormulaPage() {
 
   return (
     <Layout>
-      <PageHeader title="Formula" subtitle="Define base formula and generate by medicine quantity" />
+      <PageHeader
+        title="Formula"
+        subtitle="Manage medicine formulas: view recipes, add/edit ingredients, delete formulas, and print batch sheets"
+      />
 
-      <div className="flex gap-2 mb-6">
+      {/* Subcategory Navigation Tabs */}
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-line pb-4">
         <button
           type="button"
-          onClick={() => setActiveTab('define')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'define' ? 'bg-forest-700 text-white' : 'bg-surface text-muted hover:text-ink'
+          onClick={() => setActiveTab('view')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'view' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
           }`}
         >
-          Add Formula
+          <Eye className="w-4 h-4" /> View Formula
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('generate')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'generate' ? 'bg-forest-700 text-white' : 'bg-surface text-muted hover:text-ink'
+          onClick={() => setActiveTab('edit')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'edit' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
           }`}
         >
-          Generate Formula
+          <Edit3 className="w-4 h-4" /> Add / Edit Formula
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('delete')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'delete' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
+          }`}
+        >
+          <Trash2 className="w-4 h-4" /> Delete Formula
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('print')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'print' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
+          }`}
+        >
+          <Printer className="w-4 h-4" /> Print Formula
         </button>
       </div>
 
-      {activeTab === 'define' ? (
+      {/* 1. VIEW FORMULA TAB */}
+      {activeTab === 'view' && (
         <Card>
           <CardBody className="space-y-4">
+            <div className="flex flex-wrap gap-4 items-end">
+              <DropdownSelect
+                label="Select Medicine to View"
+                searchable
+                searchPlaceholder="Type medicine code or name..."
+                placeholder="Choose from medicine codes"
+                value={selectedMedicineCodeId}
+                onChange={val => selectMedicineCode(val)}
+                className="min-w-[260px] flex-1"
+                options={[
+                  { value: '', label: 'All Medicines (Overview)' },
+                  ...medicineOptions.map(m => ({
+                    value: String(m.medicineCodeId),
+                    label: `${m.code} — ${m.name}${m.hasRecipe ? ' (Formula Defined)' : ''}`,
+                  })),
+                ]}
+              />
+              {selectedMedicineCodeId && (
+                <Button
+                  variant="secondary"
+                  onClick={() => selectMedicineCode('')}
+                >
+                  View All Medicines
+                </Button>
+              )}
+            </div>
+
+            {message && <Alert type={message.includes('success') ? 'success' : 'error'}>{message}</Alert>}
+
+            {selectedMedicineCodeId ? (
+              <div className="space-y-4 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-surface/50 border border-line">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-ink">{selectedMedicine?.code} — {selectedMedicine?.name}</h2>
+                      {hasRecipe ? (
+                        <Badge variant="success">Formula Configured</Badge>
+                      ) : (
+                        <Badge variant="neutral">No Formula</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted mt-1">
+                      Base formula: <strong className="text-ink">{formulaQuantity} {formulaUnit}</strong>
+                      {hasRecipe && ` · ${recipe.length} herb${recipe.length === 1 ? '' : 's'} defined`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {canWrite && (
+                      <Button
+                        size="sm"
+                        onClick={() => setActiveTab('edit')}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> {hasRecipe ? 'Edit Formula' : 'Add Formula'}
+                      </Button>
+                    )}
+                    {hasRecipe && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setActiveTab('print')}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Print Formula
+                      </Button>
+                    )}
+                    {hasRecipe && isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setActiveTab('delete')}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {description && (
+                  <div className="p-3.5 rounded-lg bg-white border border-line shadow-2xs">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted block mb-1">
+                      Formula Description &amp; Notes
+                    </span>
+                    <p className="text-sm text-ink whitespace-pre-wrap">{description}</p>
+                  </div>
+                )}
+
+                {hasRecipe && recipe.length > 0 ? (
+                  <div className="space-y-3">
+                    <Table columns={viewColumns} data={recipe} />
+
+                    {(() => {
+                      const medQty = parseFloat(formulaQuantity) || 0;
+                      const summed = sumHerbQuantityInUnit(recipe, herbs, formulaUnit);
+                      const herbTotal = summed.totalInMedicineUnit || 0;
+                      const matched = medQty > 0 && Math.abs(herbTotal - medQty) <= 1e-9;
+                      const tooLow = medQty > 0 && herbTotal + 1e-9 < medQty;
+                      return (
+                        <div className={`text-sm rounded-lg border px-3.5 py-2.5 ${
+                          matched ? 'border-forest-700/40 bg-forest-700/5 text-ink'
+                            : tooLow ? 'border-red-300 bg-red-50 text-red-800'
+                              : 'border-line bg-surface/40 text-muted'
+                        }`}>
+                          Base Medicine Quantity: <strong>{formatQtyLabel(medQty, formulaUnit)}</strong>
+                          {' · '}
+                          Total Herbs: <strong>{formatQtyLabel(herbTotal, formulaUnit)}</strong>
+                          {matched && ' — balanced (100%)'}
+                          {tooLow && ' — herb sum is less than base medicine quantity'}
+                          {!matched && !tooLow && medQty > 0 && herbTotal > 0 && ' — herb sum exceeds base medicine quantity'}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center rounded-xl bg-surface/30 border border-dashed border-line space-y-3">
+                    <p className="text-muted text-sm">No formula ingredients have been configured for this medicine code yet.</p>
+                    {canWrite && (
+                      <Button
+                        size="sm"
+                        onClick={() => setActiveTab('edit')}
+                      >
+                        <Plus className="w-4 h-4" /> Add Formula Now
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-ink">All Medicine Codes &amp; Formulas</h3>
+                  <div className="relative w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search medicines..."
+                      value={overviewSearch}
+                      onChange={e => setOverviewSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-line text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-forest-700/30"
+                    />
+                  </div>
+                </div>
+                <Table columns={overviewColumns} data={filteredMedicines} />
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 2. ADD / EDIT FORMULA TAB */}
+      {activeTab === 'edit' && (
+        <Card>
+          <CardBody className="space-y-4">
+            {selectedMedicineCodeId && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-forest-50 border border-forest-200">
+                <span className="text-sm font-medium text-forest-800">
+                  {hasRecipe ? 'Editing Formula for:' : 'Configuring New Formula for:'}{' '}
+                  <strong>{selectedMedicine?.code} — {selectedMedicine?.name}</strong>
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setActiveTab('view')}>
+                  <Eye className="w-3.5 h-3.5" /> View Mode
+                </Button>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-4 items-end">
               <DropdownSelect
                 label="Medicine"
@@ -670,7 +1119,7 @@ export default function FormulaPage() {
                   { value: '', label: 'Choose from medicine codes' },
                   ...medicineOptions.map(m => ({
                     value: String(m.medicineCodeId),
-                    label: `${m.code} — ${m.name}`,
+                    label: `${m.code} — ${m.name}${m.hasRecipe ? ' (Configured)' : ''}`,
                   })),
                 ]}
               />
@@ -685,7 +1134,7 @@ export default function FormulaPage() {
             </div>
 
             <Textarea
-              label="Description"
+              label="Description / Preparation Notes"
               placeholder={selectedMedicineCodeId ? "Enter formula description, preparation instructions, or notes (optional)..." : "Select a medicine to enter description..."}
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -788,7 +1237,142 @@ export default function FormulaPage() {
             )}
           </CardBody>
         </Card>
-      ) : (
+      )}
+
+      {/* 3. DELETE FORMULA TAB */}
+      {activeTab === 'delete' && (
+        <Card>
+          <CardBody className="space-y-4">
+            {!isAdmin && (
+              <Alert type="error">Administrator permissions are required to delete formulas.</Alert>
+            )}
+
+            <div className="flex flex-wrap gap-4 items-end">
+              <DropdownSelect
+                label="Select Medicine Formula to Delete"
+                searchable
+                searchPlaceholder="Type medicine code or name..."
+                placeholder="Choose from medicine codes"
+                value={selectedMedicineCodeId}
+                onChange={val => selectMedicineCode(val)}
+                className="min-w-[260px] flex-1"
+                disabled={!isAdmin}
+                options={[
+                  { value: '', label: 'Choose a medicine' },
+                  ...medicineOptions.filter(m => m.hasRecipe).map(m => ({
+                    value: String(m.medicineCodeId),
+                    label: `${m.code} — ${m.name} (${m.recipeItemsCount || 'configured'} herbs)`,
+                  })),
+                ]}
+              />
+              {selectedMedicineCodeId && (
+                <Button
+                  variant="secondary"
+                  onClick={() => selectMedicineCode('')}
+                >
+                  Clear Selection
+                </Button>
+              )}
+            </div>
+
+            {message && <Alert type={message.includes('success') ? 'success' : 'error'}>{message}</Alert>}
+
+            {selectedMedicineCodeId ? (
+              hasRecipe && recipe.length > 0 ? (
+                <div className="p-5 rounded-xl border border-red-200 bg-red-50/40 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-red-100 text-red-700 shrink-0">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-red-900">
+                        Confirm Formula Deletion: {selectedMedicine?.code} — {selectedMedicine?.name}
+                      </h3>
+                      <p className="text-sm text-red-700 mt-1">
+                        Are you sure you want to delete the formula for this medicine? All <strong>{recipe.length}</strong> ingredient associations
+                        for base quantity <strong>{formulaQuantity} {formulaUnit}</strong> will be permanently removed.
+                        The medicine code itself will remain intact.
+                      </p>
+                    </div>
+                  </div>
+
+                  {description && (
+                    <div className="text-sm text-muted bg-white p-3 rounded-lg border border-red-100">
+                      <span className="font-semibold text-ink mr-2">Description:</span>
+                      {description}
+                    </div>
+                  )}
+
+                  <div className="bg-white rounded-lg border border-red-100 p-3">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted block mb-2">
+                      Ingredients to be removed ({recipe.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {recipe.map((r, i) => (
+                        <span key={i} className="inline-flex items-center px-2.5 py-1 rounded bg-surface text-ink text-xs font-medium border border-line">
+                          {r.herbName || 'Herb'}: <strong>{r.quantity} {r.unit}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="flex items-center gap-3 pt-2">
+                      <Button
+                        variant="danger"
+                        onClick={handleDeleteFormula}
+                        disabled={saving}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-4 h-4" /> {saving ? 'Deleting...' : 'Yes, Delete This Formula'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setActiveTab('view')}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Alert type="info">
+                  No formula is defined for <strong>{selectedMedicine?.code} — {selectedMedicine?.name}</strong>. There are no formula ingredients to delete.
+                </Alert>
+              )
+            ) : (
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-ink">Formulas Available for Deletion</h3>
+                  <div className="relative w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search formulas..."
+                      value={overviewSearch}
+                      onChange={e => setOverviewSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-line text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-forest-700/30"
+                    />
+                  </div>
+                </div>
+                {medicineOptions.filter(m => m.hasRecipe).length === 0 ? (
+                  <p className="text-sm text-muted p-4 text-center rounded-lg bg-surface/30 border border-line">
+                    No medicine formulas are currently defined.
+                  </p>
+                ) : (
+                  <Table
+                    columns={deleteOverviewColumns}
+                    data={filteredMedicines.filter(m => m.hasRecipe)}
+                  />
+                )}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 4. PRINT FORMULA TAB */}
+      {activeTab === 'print' && (
         <Card>
           <CardBody className="space-y-4">
             <div className="flex flex-wrap gap-4 items-end">
@@ -807,7 +1391,7 @@ export default function FormulaPage() {
                   { value: '', label: 'Choose from medicine codes' },
                   ...medicineOptions.map(m => ({
                     value: String(m.medicineCodeId),
-                    label: `${m.code} — ${m.name}`,
+                    label: `${m.code} — ${m.name}${m.hasRecipe ? ' (Configured)' : ''}`,
                   })),
                 ]}
               />
@@ -834,61 +1418,97 @@ export default function FormulaPage() {
                 className="w-56"
               />
               <Button onClick={handleGenerate} disabled={!selectedMedicineCodeId || !generateQuantity || !(parseFloat(generateQuantity) > 0) || generating}>
-                {generating ? 'Generating...' : 'Generate'}
+                {generating ? 'Generating...' : 'Calculate Sheet'}
               </Button>
             </div>
 
-            {medicineOptions.length === 0 && (
-              <Alert type="info">No medicine codes found. Add codes under Medicine Codes first.</Alert>
-            )}
             {message && !selectedMedicineCodeId && <Alert type="error">{message}</Alert>}
 
-            {selectedMedicineCodeId && (
-              <div className="space-y-1">
-                <p className="text-sm text-muted">
-                  Base formula: {baseFormulaQuantity} {baseFormulaUnit}. Herb requirements scale to the medicine qty you enter.
-                </p>
-                {description && (
-                  <p className="text-sm text-ink bg-surface/80 rounded-lg p-2.5 border border-line">
-                    <span className="font-medium text-muted mr-1.5">Description:</span>
-                    {description}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {message && (
-              <Alert type={message.includes('Consumed') || message.includes('success') ? 'success' : 'error'}>
-                {message}
-              </Alert>
-            )}
-
-            {generated?.items?.length > 0 && (
-              <>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-                  <p>
-                    Scaled from {generated.formulaQuantity} {generated.formulaUnit} to {generateQuantity} {generateUnit}
-                    {generateUnit !== generated.formulaUnit ? ` (${generated.batchSize} ${generated.formulaUnit})` : ''}.
-                  </p>
-                  {batchNumber && <p>Batch: <strong className="text-ink">{batchNumber}</strong></p>}
-                  {firmName && <p>Firm: <strong className="text-ink">{firmName}</strong></p>}
-                </div>
-                <Table columns={generateColumns} data={generated.items} />
-                <div className="flex gap-2 flex-wrap items-center">
-                  <Button variant="secondary" onClick={handlePrintGenerated}>
-                    <Printer className="w-4 h-4" /> Print
-                  </Button>
-                  {isAdmin && (
-                    <Button
-                      variant="saffron"
-                      onClick={handleConsume}
-                      disabled={generating || saving}
-                    >
-                      Consume Herbs
+            {selectedMedicineCodeId ? (
+              !hasRecipe ? (
+                <div className="p-6 text-center rounded-xl bg-surface/30 border border-dashed border-line space-y-3">
+                  <p className="text-muted text-sm">No base formula is defined for <strong>{selectedMedicine?.code} — {selectedMedicine?.name}</strong>. Define a formula first before generating or printing.</p>
+                  {canWrite && (
+                    <Button size="sm" onClick={() => setActiveTab('edit')}>
+                      <Plus className="w-4 h-4" /> Define Formula Now
                     </Button>
                   )}
                 </div>
-              </>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted">
+                      Base formula: <strong className="text-ink">{baseFormulaQuantity} {baseFormulaUnit}</strong>. Herb requirements scale dynamically to your entered batch quantity.
+                    </p>
+                    {description && (
+                      <p className="text-sm text-ink bg-surface/80 rounded-lg p-2.5 border border-line">
+                        <span className="font-medium text-muted mr-1.5">Description:</span>
+                        {description}
+                      </p>
+                    )}
+                  </div>
+
+                  {message && (
+                    <Alert type={message.includes('Consumed') || message.includes('success') ? 'success' : 'error'}>
+                      {message}
+                    </Alert>
+                  )}
+
+                  {generated?.items?.length > 0 && (
+                    <>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                        <p>
+                          Scaled from {generated.formulaQuantity} {generated.formulaUnit} to {generateQuantity} {generateUnit}
+                          {generateUnit !== generated.formulaUnit ? ` (${generated.batchSize} ${generated.formulaUnit})` : ''}.
+                        </p>
+                        {batchNumber && <p>Batch: <strong className="text-ink">{batchNumber}</strong></p>}
+                        {firmName && <p>Firm: <strong className="text-ink">{firmName}</strong></p>}
+                      </div>
+                      <Table columns={generateColumns} data={generated.items} />
+                      <div className="flex gap-2 flex-wrap items-center">
+                        <Button variant="secondary" onClick={handlePrintGenerated}>
+                          <Printer className="w-4 h-4" /> Print Formula Sheet
+                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="saffron"
+                            onClick={handleConsume}
+                            disabled={generating || saving}
+                          >
+                            Consume Herbs
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-ink">Formulas Ready to Print</h3>
+                  <div className="relative w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search formulas to print..."
+                      value={overviewSearch}
+                      onChange={e => setOverviewSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-line text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-forest-700/30"
+                    />
+                  </div>
+                </div>
+                {medicineOptions.filter(m => m.hasRecipe).length === 0 ? (
+                  <p className="text-sm text-muted p-4 text-center rounded-lg bg-surface/30 border border-line">
+                    No medicine formulas are currently defined.
+                  </p>
+                ) : (
+                  <Table
+                    columns={printOverviewColumns}
+                    data={filteredMedicines.filter(m => m.hasRecipe)}
+                  />
+                )}
+              </div>
             )}
           </CardBody>
         </Card>

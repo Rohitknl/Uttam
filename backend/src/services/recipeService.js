@@ -174,3 +174,14 @@ export async function resolveMedicineCodeIdForMedicine(medicineId) {
   if (!med.medicineCodeId) throw new AppError('Medicine is not linked to a medicine code', 400);
   return med.medicineCodeId;
 }
+
+export async function deleteRecipeByMedicineCodeId(medicineCodeId) {
+  const code = await prisma.medicineCode.findUnique({ where: { id: medicineCodeId } });
+  if (!code) throw new AppError('Medicine code not found', 404);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.recipeItem.deleteMany({ where: { medicineCodeId } });
+  });
+
+  return { message: 'Formula deleted successfully', medicineCodeId };
+}
