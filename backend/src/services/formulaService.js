@@ -128,6 +128,7 @@ export async function generateFormula(medicineCodeId, batchSize) {
     medicineCodeId: code.id,
     medicineName: code.name,
     medicineCode: code.code,
+    description: code.description || '',
     formulaQuantity: baseQty,
     formulaUnit: code.formulaUnit || 'PIECES',
     batchSize: toNumber(batchSize),

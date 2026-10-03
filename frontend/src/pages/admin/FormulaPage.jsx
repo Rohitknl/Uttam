@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Printer } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Select, Input, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
+import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi } from '../../api';
 
@@ -154,6 +154,7 @@ export default function FormulaPage() {
   const [selectedMedicineCodeId, setSelectedMedicineCodeId] = useState('');
   const [formulaQuantity, setFormulaQuantity] = useState('1');
   const [formulaUnit, setFormulaUnit] = useState('PIECES');
+  const [description, setDescription] = useState('');
   const [recipe, setRecipe] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -179,6 +180,7 @@ export default function FormulaPage() {
       medicineCodeId: c.id,
       code: c.code,
       name: c.name,
+      description: c.description || '',
       formulaUnit: c.formulaUnit || 'PIECES',
     }))
     .sort((a, b) => String(a.code).localeCompare(String(b.code)));
@@ -231,6 +233,7 @@ export default function FormulaPage() {
         .then(data => {
           setFormulaQuantity(String(data.formulaQuantity ?? 1));
           setFormulaUnit(data.formulaUnit || 'PIECES');
+          setDescription(data.description || '');
           setRecipe((data.items || []).map(r => {
             const herb = herbs.find(h => h.id === r.herbId);
             const opt = herbOptions.find(o => o.herbId === r.herbId)
@@ -247,6 +250,7 @@ export default function FormulaPage() {
           const opt = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
           setFormulaQuantity('1');
           setFormulaUnit(opt?.formulaUnit || 'PIECES');
+          setDescription(opt?.description || '');
           setRecipe([]);
         });
     } else if (selectedMedicineCodeId && activeTab === 'generate') {
@@ -256,6 +260,7 @@ export default function FormulaPage() {
           setBaseFormulaQuantity(data.formulaQuantity ?? 1);
           setBaseFormulaUnit(unit);
           setGenerateUnit(unit);
+          setDescription(data.description || '');
           if (!generateQuantity) setGenerateQuantity(String(data.formulaQuantity ?? 1));
         })
         .catch(() => {
@@ -264,10 +269,12 @@ export default function FormulaPage() {
           setBaseFormulaQuantity(1);
           setBaseFormulaUnit(unit);
           setGenerateUnit(unit);
+          setDescription(opt?.description || '');
         });
     } else if (!selectedMedicineCodeId) {
       setFormulaQuantity('1');
       setFormulaUnit('PIECES');
+      setDescription('');
       setRecipe([]);
       setGenerateQuantity('');
       setGenerateUnit('PIECES');
@@ -437,8 +444,14 @@ export default function FormulaPage() {
       await medicineCodesApi.updateRecipe(selectedMedicineCodeId, {
         formulaQuantity: medQty,
         formulaUnit,
+        description: description ? description.trim() : '',
         items,
       });
+      setMedicineOptions(prev => prev.map(m => (
+        String(m.medicineCodeId) === String(selectedMedicineCodeId)
+          ? { ...m, description: description ? description.trim() : '' }
+          : m
+      )));
       setMessage('Formula saved successfully');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Save failed');
@@ -476,6 +489,7 @@ export default function FormulaPage() {
     const name = generated.medicineName || selected?.name || '—';
     const displayFirm = (firmName || '').trim() || 'Uttam Laboratories';
     const displayBatch = (batchNumber || '').trim();
+    const displayDescription = (description || generated?.description || '').trim();
     const esc = (s) => String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -521,6 +535,7 @@ export default function FormulaPage() {
     <div><span>Batch Number</span><strong>${esc(displayBatch || '—')}</strong></div>
     <div><span>Medicine Code</span><strong>${esc(code)}</strong></div>
     <div><span>Medicine</span><strong>${esc(name)}</strong></div>
+    ${displayDescription ? `<div style="grid-column: span 2;"><span>Description</span><strong>${esc(displayDescription)}</strong></div>` : ''}
     <div><span>Base Formula</span><strong>${esc(generated.formulaQuantity)} ${esc(generated.formulaUnit)}</strong></div>
     <div><span>Generate Qty</span><strong>${esc(generateQuantity)} ${esc(generateUnit)}${generateUnit !== generated.formulaUnit ? ` (${esc(generated.batchSize)} ${esc(generated.formulaUnit)})` : ''}</strong></div>
     <div><span>Date</span><strong>${new Date().toLocaleDateString('en-IN')}</strong></div>
@@ -668,6 +683,15 @@ export default function FormulaPage() {
                 disabled={!canWrite}
               />
             </div>
+
+            <Textarea
+              label="Description"
+              placeholder={selectedMedicineCodeId ? "Enter formula description, preparation instructions, or notes (optional)..." : "Select a medicine to enter description..."}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              disabled={!canWrite || !selectedMedicineCodeId}
+              rows={2}
+            />
 
             {medicineOptions.length === 0 && (
               <Alert type="info">No medicine codes found. Add codes under Medicine Codes first.</Alert>
@@ -820,9 +844,17 @@ export default function FormulaPage() {
             {message && !selectedMedicineCodeId && <Alert type="error">{message}</Alert>}
 
             {selectedMedicineCodeId && (
-              <p className="text-sm text-muted">
-                Base formula: {baseFormulaQuantity} {baseFormulaUnit}. Herb requirements scale to the medicine qty you enter.
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm text-muted">
+                  Base formula: {baseFormulaQuantity} {baseFormulaUnit}. Herb requirements scale to the medicine qty you enter.
+                </p>
+                {description && (
+                  <p className="text-sm text-ink bg-surface/80 rounded-lg p-2.5 border border-line">
+                    <span className="font-medium text-muted mr-1.5">Description:</span>
+                    {description}
+                  </p>
+                )}
+              </div>
             )}
 
             {message && (

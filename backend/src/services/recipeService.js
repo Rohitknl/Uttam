@@ -32,6 +32,7 @@ export async function getRecipeByMedicineCodeId(medicineCodeId) {
     medicineCodeId: code.id,
     medicineCode: code.code,
     medicineName: code.name,
+    description: code.description || '',
     formulaQuantity: toNumber(code.formulaQuantity ?? 1),
     formulaUnit: code.formulaUnit || 'PIECES',
     items: formatRecipeItems(code.recipeItems),
@@ -54,6 +55,7 @@ export async function updateRecipeByMedicineCodeId(medicineCodeId, data) {
   const items = Array.isArray(data) ? data : (data.items || []);
   const formulaQuantity = Array.isArray(data) ? undefined : data.formulaQuantity;
   const formulaUnit = Array.isArray(data) ? undefined : data.formulaUnit;
+  const description = Array.isArray(data) ? undefined : data.description;
 
   if (!items.length) {
     throw new AppError('Add at least one herb with quantity before saving the formula', 400);
@@ -139,12 +141,13 @@ export async function updateRecipeByMedicineCodeId(medicineCodeId, data) {
   }
 
   await prisma.$transaction(async (tx) => {
-    if (formulaQuantity !== undefined || formulaUnit !== undefined) {
+    if (formulaQuantity !== undefined || formulaUnit !== undefined || description !== undefined) {
       await tx.medicineCode.update({
         where: { id: medicineCodeId },
         data: {
           ...(formulaQuantity !== undefined ? { formulaQuantity } : {}),
           ...(formulaUnit !== undefined ? { formulaUnit } : {}),
+          ...(description !== undefined ? { description: description ? String(description).trim() : null } : {}),
         },
       });
     }

@@ -36,6 +36,7 @@ router.put('/:id/recipe', authenticate, requireAdmin, asyncHandler(async (req, r
   const recipeUpdateSchema = z.object({
     formulaQuantity: z.number().positive().optional().default(1),
     formulaUnit: z.enum(['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES']).optional().default('PIECES'),
+    description: z.string().nullable().optional(),
     items: z.array(recipeItemSchema),
   });
   const data = recipeUpdateSchema.parse(req.body);
