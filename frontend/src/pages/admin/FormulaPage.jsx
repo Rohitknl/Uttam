@@ -989,87 +989,167 @@ export default function FormulaPage() {
 
   return (
     <Layout>
-      {/* Header and Right-Aligned Subcategory Navigation Tabs */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 border-b border-line pb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-ink">Formula</h1>
-          <p className="text-muted mt-0.5 text-sm">
-            Manage medicine formulas: view recipes, add/edit ingredients, delete formulas, and print batch sheets
-          </p>
-        </div>
-
-        {/* Subcategories moved to the right */}
-        <div className="flex flex-wrap items-center justify-end gap-2 lg:ml-auto">
-          <button
-            type="button"
-            onClick={() => setActiveTab('view')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'view'
-                ? 'bg-forest-700 text-white shadow-sm'
-                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-            }`}
-          >
-            <Eye className="w-4 h-4" />
-            <span>View Formula</span>
-            {unlockedCategories.view ? (
-              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('edit')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'edit'
-                ? 'bg-forest-700 text-white shadow-sm'
-                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-            }`}
-          >
-            <Edit3 className="w-4 h-4" />
-            <span>Add / Edit Formula</span>
-            {unlockedCategories.edit ? (
-              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('delete')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'delete'
-                ? 'bg-forest-700 text-white shadow-sm'
-                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-            }`}
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Delete Formula</span>
-            {unlockedCategories.delete ? (
-              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('print')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'print'
-                ? 'bg-forest-700 text-white shadow-sm'
-                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-            }`}
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print Formula</span>
-            {unlockedCategories.print ? (
-              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
-            )}
-          </button>
-        </div>
+      {/* Page Header */}
+      <div className="mb-6 border-b border-line pb-4">
+        <h1 className="font-display text-2xl font-bold text-ink">Formula Management</h1>
+        <p className="text-muted mt-1 text-sm">
+          Define and manage medicine formulas: view recipes, configure ingredients, delete formulas, and print batch sheets
+        </p>
       </div>
+
+      {/* 2-Column Split: Left Panel (Subcategories) + Right Panel (Category Content) */}
+      <div className="flex flex-col md:flex-row md:items-start gap-6">
+        {/* Left Panel: Subcategories */}
+        <aside className="w-full md:w-64 lg:w-72 shrink-0 space-y-4">
+          <Card className="overflow-hidden">
+            <div className="px-4 py-3 bg-surface border-b border-line flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted">
+                Subcategories
+              </span>
+              <span className="text-[11px] font-semibold text-forest-800 bg-forest-100/80 px-2 py-0.5 rounded-full">
+                {Object.values(unlockedCategories).filter(Boolean).length}/4 Unlocked
+              </span>
+            </div>
+
+            <div className="p-2 space-y-1">
+              {/* View Formula */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('view')}
+                className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all ${
+                  activeTab === 'view'
+                    ? 'bg-forest-700 text-white shadow-sm'
+                    : 'text-ink hover:bg-forest-50 hover:text-forest-900'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'view' ? 'bg-white/15 text-white' : 'bg-surface text-forest-700'}`}>
+                    <Eye className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">View Formula</div>
+                    <div className={`text-xs truncate ${activeTab === 'view' ? 'text-white/70' : 'text-muted'}`}>
+                      Inspect recipe &amp; stock
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0 ml-2">
+                  {unlockedCategories.view ? (
+                    <Unlock className={`w-3.5 h-3.5 ${activeTab === 'view' ? 'text-emerald-300' : 'text-emerald-600'}`} />
+                  ) : (
+                    <Lock className={`w-3.5 h-3.5 ${activeTab === 'view' ? 'text-white/60' : 'text-muted/60'}`} />
+                  )}
+                </div>
+              </button>
+
+              {/* Add / Edit Formula */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all ${
+                  activeTab === 'edit'
+                    ? 'bg-forest-700 text-white shadow-sm'
+                    : 'text-ink hover:bg-forest-50 hover:text-forest-900'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'edit' ? 'bg-white/15 text-white' : 'bg-surface text-forest-700'}`}>
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">Add / Edit Formula</div>
+                    <div className={`text-xs truncate ${activeTab === 'edit' ? 'text-white/70' : 'text-muted'}`}>
+                      Configure ingredients
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0 ml-2">
+                  {unlockedCategories.edit ? (
+                    <Unlock className={`w-3.5 h-3.5 ${activeTab === 'edit' ? 'text-emerald-300' : 'text-emerald-600'}`} />
+                  ) : (
+                    <Lock className={`w-3.5 h-3.5 ${activeTab === 'edit' ? 'text-white/60' : 'text-muted/60'}`} />
+                  )}
+                </div>
+              </button>
+
+              {/* Delete Formula */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('delete')}
+                className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all ${
+                  activeTab === 'delete'
+                    ? 'bg-forest-700 text-white shadow-sm'
+                    : 'text-ink hover:bg-forest-50 hover:text-forest-900'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'delete' ? 'bg-white/15 text-white' : 'bg-surface text-forest-700'}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">Delete Formula</div>
+                    <div className={`text-xs truncate ${activeTab === 'delete' ? 'text-white/70' : 'text-muted'}`}>
+                      Remove formula items
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0 ml-2">
+                  {unlockedCategories.delete ? (
+                    <Unlock className={`w-3.5 h-3.5 ${activeTab === 'delete' ? 'text-emerald-300' : 'text-emerald-600'}`} />
+                  ) : (
+                    <Lock className={`w-3.5 h-3.5 ${activeTab === 'delete' ? 'text-white/60' : 'text-muted/60'}`} />
+                  )}
+                </div>
+              </button>
+
+              {/* Print Formula */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('print')}
+                className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all ${
+                  activeTab === 'print'
+                    ? 'bg-forest-700 text-white shadow-sm'
+                    : 'text-ink hover:bg-forest-50 hover:text-forest-900'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'print' ? 'bg-white/15 text-white' : 'bg-surface text-forest-700'}`}>
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">Print Formula</div>
+                    <div className={`text-xs truncate ${activeTab === 'print' ? 'text-white/70' : 'text-muted'}`}>
+                      Scale &amp; print sheets
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0 ml-2">
+                  {unlockedCategories.print ? (
+                    <Unlock className={`w-3.5 h-3.5 ${activeTab === 'print' ? 'text-emerald-300' : 'text-emerald-600'}`} />
+                  ) : (
+                    <Lock className={`w-3.5 h-3.5 ${activeTab === 'print' ? 'text-white/60' : 'text-muted/60'}`} />
+                  )}
+                </div>
+              </button>
+            </div>
+
+            {Object.values(unlockedCategories).some(Boolean) && (
+              <div className="p-2 border-t border-line bg-surface/30">
+                <button
+                  type="button"
+                  onClick={() => setUnlockedCategories({ view: false, edit: false, delete: false, print: false })}
+                  className="w-full py-1.5 px-3 rounded text-xs font-medium text-muted hover:text-red-700 hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Lock className="w-3 h-3" />
+                  <span>Lock All Categories</span>
+                </button>
+              </div>
+            )}
+          </Card>
+        </aside>
+
+        {/* Right Main Content Area */}
+        <main className="flex-1 min-w-0 space-y-4">
 
       {/* Category Lock Screen */}
       {!unlockedCategories[activeTab] ? (
@@ -1738,6 +1818,8 @@ export default function FormulaPage() {
       )}
         </>
       )}
+        </main>
+      </div>
 
       {/* Set Category Password Modal */}
       <Modal
