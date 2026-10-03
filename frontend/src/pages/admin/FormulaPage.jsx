@@ -284,6 +284,12 @@ export default function FormulaPage() {
     setSearchParams(tab === 'view' ? {} : { tab });
   };
 
+  useEffect(() => {
+    setMessage('');
+    setPasswordInput('');
+    setPasswordError('');
+  }, [activeTab]);
+
   const buildOptions = (codes) => codes
     .filter(c => c.active !== false)
     .map(c => ({
@@ -996,7 +1002,7 @@ export default function FormulaPage() {
 
   return (
     <Layout>
-      {/* Page Header and Subcategory Status */}
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-line pb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -1006,33 +1012,6 @@ export default function FormulaPage() {
           <p className="text-muted mt-1 text-sm">
             {CATEGORY_DESCRIPTIONS[activeTab]}
           </p>
-        </div>
-
-        {/* Subcategory Navigation Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {Object.entries(CATEGORY_NAMES).map(([key, label]) => {
-            const isCurrent = activeTab === key;
-            const isUnlocked = unlockedCategories[key];
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  isCurrent
-                    ? 'bg-forest-700 text-white shadow-sm'
-                    : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-                }`}
-              >
-                <span>{label}</span>
-                {isUnlocked ? (
-                  <Unlock className="w-3 h-3 text-emerald-300" />
-                ) : (
-                  <Lock className="w-3 h-3 opacity-60" />
-                )}
-              </button>
-            );
-          })}
         </div>
       </div>
 
