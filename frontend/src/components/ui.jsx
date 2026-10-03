@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 
 export function Card({ children, className = '' }) {
   const hasBg = className.includes('bg-');
@@ -47,14 +47,34 @@ export function Button({ children, variant = 'primary', size = 'md', className =
   );
 }
 
-export function Input({ label, error, className = '', ...props }) {
+export function Input({ label, error, className = '', type = 'text', showPasswordToggle = true, ...props }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+  const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
+
   return (
     <div className={className}>
       {label && <label className="block text-sm font-medium text-ink mb-1">{label}</label>}
-      <input
-        className={`w-full px-3 py-2 rounded-lg border border-line bg-white text-ink placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 ${error ? 'border-red-500' : ''}`}
-        {...props}
-      />
+      <div className="relative">
+        <input
+          type={effectiveType}
+          className={`w-full px-3 py-2 ${isPassword && showPasswordToggle ? 'pr-10' : ''} rounded-lg border border-line bg-white text-ink placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 ${error ? 'border-red-500' : ''}`}
+          {...props}
+        />
+        {isPassword && showPasswordToggle && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            onMouseDown={(e) => e.preventDefault()}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-ink focus:outline-none transition-colors cursor-pointer select-none"
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            title={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? <EyeOff className="w-4 h-4 text-muted hover:text-forest-700" /> : <Eye className="w-4 h-4 text-muted hover:text-forest-700" />}
+          </button>
+        )}
+      </div>
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
   );
