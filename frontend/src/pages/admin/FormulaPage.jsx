@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle } from 'lucide-react';
+import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle, Lock, Unlock, Key } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
+import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
-import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi } from '../../api';
+import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi, settingsApi } from '../../api';
 
 const UNITS = ['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES'];
 
@@ -174,8 +174,106 @@ export default function FormulaPage() {
   const [firmName, setFirmName] = useState('');
   const [overviewSearch, setOverviewSearch] = useState('');
 
+  // Category password protection state
+  const [unlockedCategories, setUnlockedCategories] = useState({
+    view: false,
+    edit: false,
+    delete: false,
+    print: false,
+  });
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+
+  // Set category password modal state
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+  const [targetCategoryForPassword, setTargetCategoryForPassword] = useState('view');
+  const [setPasswordForm, setSetPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [setPasswordMessage, setSetPasswordMessage] = useState('');
+  const [setPasswordLoading, setSetPasswordLoading] = useState(false);
+
+  const CATEGORY_NAMES = {
+    view: 'View Formula',
+    edit: 'Add / Edit Formula',
+    delete: 'Delete Formula',
+    print: 'Print Formula',
+  };
+
+  const handleUnlockCategory = async (category) => {
+    if (!passwordInput.trim()) {
+      setPasswordError('Please enter a password');
+      return;
+    }
+    setVerifyingPassword(true);
+    setPasswordError('');
+    try {
+      await settingsApi.verifyCategoryPassword(category, passwordInput);
+      setUnlockedCategories(prev => ({ ...prev, [category]: true }));
+      setPasswordInput('');
+      setPasswordError('');
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Incorrect password. Please try again.');
+    } finally {
+      setVerifyingPassword(false);
+    }
+  };
+
+  const handleLockCategory = (category) => {
+    setUnlockedCategories(prev => ({ ...prev, [category]: false }));
+    setPasswordInput('');
+    setPasswordError('');
+  };
+
+  const openSetPasswordModal = (category) => {
+    setTargetCategoryForPassword(category);
+    setSetPasswordForm({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setSetPasswordMessage('');
+    setShowSetPasswordModal(true);
+  };
+
+  const handleSaveCategoryPassword = async (e) => {
+    e.preventDefault();
+    setSetPasswordMessage('');
+    if (setPasswordForm.newPassword.length < 4) {
+      setSetPasswordMessage('New password must be at least 4 characters');
+      return;
+    }
+    if (setPasswordForm.newPassword !== setPasswordForm.confirmPassword) {
+      setSetPasswordMessage('New password and confirm password do not match');
+      return;
+    }
+    setSetPasswordLoading(true);
+    try {
+      const res = await settingsApi.setCategoryPassword({
+        category: targetCategoryForPassword,
+        currentPassword: setPasswordForm.currentPassword,
+        newPassword: setPasswordForm.newPassword,
+        confirmPassword: setPasswordForm.confirmPassword,
+      });
+      setSetPasswordMessage(res.message || 'Password updated successfully!');
+      setTimeout(() => {
+        setShowSetPasswordModal(false);
+        setSetPasswordMessage('');
+      }, 1200);
+    } catch (err) {
+      setSetPasswordMessage(err.response?.data?.message || 'Failed to update password');
+    } finally {
+      setSetPasswordLoading(false);
+    }
+  };
+
   const setActiveTab = (tab) => {
     setMessage('');
+    setPasswordInput('');
+    setPasswordError('');
     setSearchParams(tab === 'view' ? {} : { tab });
   };
 
@@ -891,50 +989,175 @@ export default function FormulaPage() {
 
   return (
     <Layout>
-      <PageHeader
-        title="Formula"
-        subtitle="Manage medicine formulas: view recipes, add/edit ingredients, delete formulas, and print batch sheets"
-      />
+      {/* Header and Right-Aligned Subcategory Navigation Tabs */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 border-b border-line pb-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-ink">Formula</h1>
+          <p className="text-muted mt-0.5 text-sm">
+            Manage medicine formulas: view recipes, add/edit ingredients, delete formulas, and print batch sheets
+          </p>
+        </div>
 
-      {/* Subcategory Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-line pb-4">
-        <button
-          type="button"
-          onClick={() => setActiveTab('view')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'view' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-          }`}
-        >
-          <Eye className="w-4 h-4" /> View Formula
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('edit')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'edit' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-          }`}
-        >
-          <Edit3 className="w-4 h-4" /> Add / Edit Formula
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('delete')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'delete' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-          }`}
-        >
-          <Trash2 className="w-4 h-4" /> Delete Formula
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('print')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'print' ? 'bg-forest-700 text-white shadow-sm' : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
-          }`}
-        >
-          <Printer className="w-4 h-4" /> Print Formula
-        </button>
+        {/* Subcategories moved to the right */}
+        <div className="flex flex-wrap items-center justify-end gap-2 lg:ml-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('view')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'view'
+                ? 'bg-forest-700 text-white shadow-sm'
+                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
+            }`}
+          >
+            <Eye className="w-4 h-4" />
+            <span>View Formula</span>
+            {unlockedCategories.view ? (
+              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('edit')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'edit'
+                ? 'bg-forest-700 text-white shadow-sm'
+                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
+            }`}
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Add / Edit Formula</span>
+            {unlockedCategories.edit ? (
+              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('delete')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'delete'
+                ? 'bg-forest-700 text-white shadow-sm'
+                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
+            }`}
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete Formula</span>
+            {unlockedCategories.delete ? (
+              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('print')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'print'
+                ? 'bg-forest-700 text-white shadow-sm'
+                : 'bg-surface text-muted hover:text-ink hover:bg-forest-50'
+            }`}
+          >
+            <Printer className="w-4 h-4" />
+            <span>Print Formula</span>
+            {unlockedCategories.print ? (
+              <Unlock className="w-3.5 h-3.5 text-emerald-300 ml-0.5" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Category Lock Screen */}
+      {!unlockedCategories[activeTab] ? (
+        <Card className="max-w-md mx-auto my-12 border-line shadow-sm">
+          <CardBody className="p-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-forest-100/80 text-forest-800 flex items-center justify-center">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-ink">
+                {CATEGORY_NAMES[activeTab]}
+              </h2>
+              <p className="text-sm text-muted mt-1">
+                This category is password protected. Enter password to unlock.
+              </p>
+            </div>
+
+            {passwordError && (
+              <Alert type="error">{passwordError}</Alert>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleUnlockCategory(activeTab);
+              }}
+              className="space-y-4 text-left pt-2"
+            >
+              <Input
+                type="password"
+                label="Category Password"
+                placeholder="Enter password..."
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError('');
+                }}
+                showPasswordToggle={true}
+                autoFocus
+              />
+
+              <Button
+                type="submit"
+                className="w-full justify-center"
+                disabled={verifyingPassword || !passwordInput}
+              >
+                {verifyingPassword ? 'Verifying...' : `Unlock ${CATEGORY_NAMES[activeTab]}`}
+              </Button>
+            </form>
+
+            <div className="pt-3 text-xs text-muted border-t border-line/60">
+              Accepts category password, master password (<code>UttamLab@27</code>), or admin login password.
+            </div>
+          </CardBody>
+        </Card>
+      ) : (
+        <>
+          {/* Unlocked Category Status & Security Bar */}
+          <div className="flex items-center justify-between text-xs text-muted mb-3 px-1">
+            <div className="flex items-center gap-1.5 text-forest-700 font-medium">
+              <Unlock className="w-3.5 h-3.5 text-forest-600" />
+              <span>{CATEGORY_NAMES[activeTab]} (Unlocked)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => openSetPasswordModal(activeTab)}
+                  className="inline-flex items-center gap-1 text-muted hover:text-forest-700 transition-colors cursor-pointer"
+                  title="Set or change password for this category"
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  <span>Set / Change Password</span>
+                </button>
+              )}
+              {isAdmin && <span className="text-line">|</span>}
+              <button
+                type="button"
+                onClick={() => handleLockCategory(activeTab)}
+                className="inline-flex items-center gap-1 text-muted hover:text-red-600 transition-colors cursor-pointer"
+                title="Lock this category"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Lock Category</span>
+              </button>
+            </div>
+          </div>
 
       {/* 1. VIEW FORMULA TAB */}
       {activeTab === 'view' && (
@@ -1513,6 +1736,78 @@ export default function FormulaPage() {
           </CardBody>
         </Card>
       )}
+        </>
+      )}
+
+      {/* Set Category Password Modal */}
+      <Modal
+        open={showSetPasswordModal}
+        onClose={() => {
+          setShowSetPasswordModal(false);
+          setSetPasswordMessage('');
+        }}
+        title={`Set Password for ${CATEGORY_NAMES[targetCategoryForPassword] || 'Category'}`}
+      >
+        <form onSubmit={handleSaveCategoryPassword} className="space-y-4">
+          <p className="text-xs text-muted">
+            You can set a dedicated password for this category. Once set, users can enter this password (or the administrator password) to unlock <strong>{CATEGORY_NAMES[targetCategoryForPassword]}</strong>.
+          </p>
+
+          {setPasswordMessage && (
+            <Alert type={setPasswordMessage.includes('success') ? 'success' : 'error'}>
+              {setPasswordMessage}
+            </Alert>
+          )}
+
+          <Input
+            type="password"
+            label="Current Category or Admin Password"
+            value={setPasswordForm.currentPassword}
+            onChange={e => setSetPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+            showPasswordToggle={true}
+            placeholder="Enter current password..."
+            required
+          />
+
+          <Input
+            type="password"
+            label="New Category Password (min 4 characters)"
+            value={setPasswordForm.newPassword}
+            onChange={e => setSetPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+            showPasswordToggle={true}
+            placeholder="Enter new password..."
+            required
+          />
+
+          <Input
+            type="password"
+            label="Confirm New Password"
+            value={setPasswordForm.confirmPassword}
+            onChange={e => setSetPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+            showPasswordToggle={true}
+            placeholder="Re-enter new password..."
+            required
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-line">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowSetPasswordModal(false);
+                setSetPasswordMessage('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={setPasswordLoading || !setPasswordForm.newPassword}
+            >
+              {setPasswordLoading ? 'Saving...' : 'Save Password'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </Layout>
   );
 }
