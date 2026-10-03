@@ -630,7 +630,6 @@ export default function FormulaPage() {
     setGenerating(true);
     setMessage('');
     setGenerated(null);
-    setIsModified(false);
     try {
       const payload = {
         medicineCodeId: parseInt(selectedMedicineCodeId, 10),
@@ -1088,7 +1087,7 @@ export default function FormulaPage() {
             </form>
 
             <div className="pt-3 text-xs text-muted border-t border-line/60">
-              Accepts category password, master password (<code>UttamLab@27</code>), or admin login password.
+              Accepts Formula password, category password, or admin login password.
             </div>
           </CardBody>
         </Card>

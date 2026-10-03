@@ -4,8 +4,8 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
-
-
+// Disable hardware acceleration to prevent typing freezes/hangs on Windows 10
+app.disableHardwareAcceleration();
 ipcMain.handle('dialog:select-folder', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {

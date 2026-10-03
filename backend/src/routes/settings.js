@@ -13,6 +13,10 @@ router.post('/crud-password', authenticate, requireAdmin, asyncHandler(async (re
   res.json(await settingsService.setCrudPassword(req.user.userId, req.body || {}));
 }));
 
+router.post('/formula-password', authenticate, requireAdmin, asyncHandler(async (req, res) => {
+  res.json(await settingsService.setFormulaPassword(req.user.userId, req.body || {}));
+}));
+
 router.post('/verify-category-password', authenticate, requireAdminOrViewer, asyncHandler(async (req, res) => {
   const { category, password } = req.body || {};
   if (!password) {

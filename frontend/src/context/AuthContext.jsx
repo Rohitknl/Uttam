@@ -10,15 +10,18 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(true);
   const [crudPasswordSet, setCrudPasswordSet] = useState(false);
+  const [formulaPasswordSet, setFormulaPasswordSet] = useState(false);
 
   const refreshSecurity = async (role) => {
     if (role !== 'ROLE_ADMIN') {
       setCrudPasswordSet(true);
+      setFormulaPasswordSet(true);
       return true;
     }
     try {
       const status = await settingsApi.security();
       setCrudPasswordSet(Boolean(status.crudPasswordSet));
+      setFormulaPasswordSet(Boolean(status.formulaPasswordSet));
       return true;
     } catch {
       // Do not assume password is set on failure — that blocks first-time setup / reset.
@@ -84,6 +87,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('ul_user');
     setUser(null);
     setCrudPasswordSet(false);
+    setFormulaPasswordSet(false);
   };
 
   const refreshUser = async () => {
@@ -113,6 +117,7 @@ export function AuthProvider({ children }) {
       isDealer,
       canWrite,
       crudPasswordSet,
+      formulaPasswordSet,
       needsLoginPasswordSetup,
       needsCrudPasswordSetup,
       needsPasswordSetup,

@@ -115,6 +115,7 @@ export const backupApi = {
 export const settingsApi = {
   security: () => client.get('/settings/security').then(r => r.data),
   setCrudPassword: (data) => client.post('/settings/crud-password', data).then(r => r.data),
+  setFormulaPassword: (data) => client.post('/settings/formula-password', data).then(r => r.data),
   verifyCategoryPassword: (category, password) => client.post('/settings/verify-category-password', { category, password }).then(r => r.data),
   getCategoryPasswords: () => client.get('/settings/category-passwords').then(r => r.data),
   setCategoryPassword: (data) => client.post('/settings/category-password', data).then(r => r.data),

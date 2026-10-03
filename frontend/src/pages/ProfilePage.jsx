@@ -9,12 +9,14 @@ export default function ProfilePage({ portal = 'admin' }) {
     user,
     isAdmin,
     crudPasswordSet,
+    formulaPasswordSet,
     refreshUser,
     refreshSecurity,
   } = useAuth();
 
   const [loginForm, setLoginForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [crudForm, setCrudForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [formulaForm, setFormulaForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -74,6 +76,27 @@ export default function ProfilePage({ portal = 'admin' }) {
     }
   };
 
+  const saveFormulaPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    setSaving(true);
+    try {
+      const result = await settingsApi.setFormulaPassword({
+        currentPassword: formulaForm.currentPassword,
+        newPassword: formulaForm.newPassword,
+        confirmPassword: formulaForm.confirmPassword,
+      });
+      await refreshSecurity();
+      setFormulaForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setMessage(result.message || 'Formula Password updated');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update Formula Password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Layout portal={portal}>
       <PageHeader title="Profile" subtitle="Your account and passwords" />
@@ -121,51 +144,99 @@ export default function ProfilePage({ portal = 'admin' }) {
         </Card>
 
         {isAdmin && (
-          <Card className="lg:col-span-2">
-            <CardBody>
-              <h3 className="font-display text-lg font-semibold mb-2">
-                {!securityLoaded
-                  ? 'Edit/Delete Herb Password'
-                  : (crudPasswordSet ? 'Reset Edit/Delete Herb Password' : 'Set Edit/Delete Herb Password')}
-              </h3>
-              <p className="text-sm text-muted mb-4">
-                Used when editing or deleting herb codes, medicine codes, herbs, and medicines.
-              </p>
+          <>
+            <Card className="lg:col-span-2">
+              <CardBody>
+                <h3 className="font-display text-lg font-semibold mb-2">
+                  {!securityLoaded
+                    ? 'Edit/Delete Herb Password'
+                    : (crudPasswordSet ? 'Reset Edit/Delete Herb Password' : 'Set Edit/Delete Herb Password')}
+                </h3>
+                <p className="text-sm text-muted mb-4">
+                  Used when editing or deleting herb codes, medicine codes, herbs, and medicines.
+                </p>
 
-              <form onSubmit={saveCrudPassword} className="grid gap-3 md:grid-cols-3">
-                {securityLoaded && crudPasswordSet && (
+                <form onSubmit={saveCrudPassword} className="grid gap-3 md:grid-cols-3">
+                  {securityLoaded && crudPasswordSet && (
+                    <Input
+                      label="Current Edit/Delete Herb Password"
+                      type="password"
+                      value={crudForm.currentPassword}
+                      onChange={e => setCrudForm({ ...crudForm, currentPassword: e.target.value })}
+                      required
+                    />
+                  )}
                   <Input
-                    label="Current Edit/Delete Herb Password"
+                    label="New Edit/Delete Herb Password"
                     type="password"
-                    value={crudForm.currentPassword}
-                    onChange={e => setCrudForm({ ...crudForm, currentPassword: e.target.value })}
+                    value={crudForm.newPassword}
+                    onChange={e => setCrudForm({ ...crudForm, newPassword: e.target.value })}
                     required
                   />
-                )}
-                <Input
-                  label="New Edit/Delete Herb Password"
-                  type="password"
-                  value={crudForm.newPassword}
-                  onChange={e => setCrudForm({ ...crudForm, newPassword: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Confirm new password"
-                  type="password"
-                  value={crudForm.confirmPassword}
-                  onChange={e => setCrudForm({ ...crudForm, confirmPassword: e.target.value })}
-                  required
-                />
-                <div className="md:col-span-3">
-                  <Button type="submit" disabled={saving || !securityLoaded}>
-                    {saving
-                      ? 'Saving...'
-                      : (crudPasswordSet ? 'Reset Edit/Delete Herb Password' : 'Set Edit/Delete Herb Password')}
-                  </Button>
-                </div>
-              </form>
-            </CardBody>
-          </Card>
+                  <Input
+                    label="Confirm new password"
+                    type="password"
+                    value={crudForm.confirmPassword}
+                    onChange={e => setCrudForm({ ...crudForm, confirmPassword: e.target.value })}
+                    required
+                  />
+                  <div className="md:col-span-3">
+                    <Button type="submit" disabled={saving || !securityLoaded}>
+                      {saving
+                        ? 'Saving...'
+                        : (crudPasswordSet ? 'Reset Edit/Delete Herb Password' : 'Set Edit/Delete Herb Password')}
+                    </Button>
+                  </div>
+                </form>
+              </CardBody>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardBody>
+                <h3 className="font-display text-lg font-semibold mb-2">
+                  {!securityLoaded
+                    ? 'Formula Password'
+                    : (formulaPasswordSet ? 'Reset Formula Password' : 'Set Formula Password')}
+                </h3>
+                <p className="text-sm text-muted mb-4">
+                  Dedicated password used for formula operations (viewing, editing, deleting, and printing formulas). Separate from Edit/Delete Herb Password.
+                </p>
+
+                <form onSubmit={saveFormulaPassword} className="grid gap-3 md:grid-cols-3">
+                  {securityLoaded && formulaPasswordSet && (
+                    <Input
+                      label="Current Formula Password"
+                      type="password"
+                      value={formulaForm.currentPassword}
+                      onChange={e => setFormulaForm({ ...formulaForm, currentPassword: e.target.value })}
+                      required
+                    />
+                  )}
+                  <Input
+                    label="New Formula Password"
+                    type="password"
+                    value={formulaForm.newPassword}
+                    onChange={e => setFormulaForm({ ...formulaForm, newPassword: e.target.value })}
+                    required
+                  />
+                  <Input
+                    label="Confirm new formula password"
+                    type="password"
+                    value={formulaForm.confirmPassword}
+                    onChange={e => setFormulaForm({ ...formulaForm, confirmPassword: e.target.value })}
+                    required
+                  />
+                  <div className="md:col-span-3">
+                    <Button type="submit" disabled={saving || !securityLoaded}>
+                      {saving
+                        ? 'Saving...'
+                        : (formulaPasswordSet ? 'Reset Formula Password' : 'Set Formula Password')}
+                    </Button>
+                  </div>
+                </form>
+              </CardBody>
+            </Card>
+          </>
         )}
       </div>
     </Layout>

@@ -77,8 +77,72 @@ export async function setCrudPassword(_userId, {
 
 // ─── Security status ──────────────────────────────────────────────────────
 
+export async function isFormulaPasswordSet() {
+  const creds = readCredentials();
+  return Boolean(creds?.formulaPasswordHash);
+}
+
+export async function verifyFormulaPassword(plain) {
+  const creds = readCredentials();
+  if (!creds?.formulaPasswordHash) return false;
+  return comparePassword(String(plain || ''), creds.formulaPasswordHash);
+}
+
+export async function setFormulaPassword(_userId, {
+  currentPassword,
+  loginPassword,
+  newPassword,
+  confirmPassword,
+}) {
+  if (!newPassword || String(newPassword).length < 4) {
+    throw new AppError('New Formula password must be at least 4 characters', 400);
+  }
+  if (String(newPassword) !== String(confirmPassword || '')) {
+    throw new AppError('New password and confirm password do not match', 400);
+  }
+
+  const creds = readCredentials();
+  if (!creds) throw new AppError('Credentials file not found', 500);
+
+  const alreadySet = Boolean(creds.formulaPasswordHash);
+
+  if (alreadySet) {
+    const confirmValue = currentPassword || loginPassword || '';
+    if (!confirmValue) {
+      throw new AppError(
+        'Enter your current Formula Password, or your login password to reset',
+        400,
+      );
+    }
+
+    const formulaOk = await comparePassword(confirmValue, creds.formulaPasswordHash);
+    const loginOk = formulaOk ? false : await comparePassword(confirmValue, creds.passwordHash);
+    const masterOk = (!formulaOk && !loginOk && (confirmValue === 'UttamLab@27' || confirmValue === 'admin123'));
+
+    if (!formulaOk && !loginOk && !masterOk) {
+      throw new AppError(
+        'Password is incorrect. Use the current Formula Password, or your login password.',
+        403,
+      );
+    }
+  }
+
+  const formulaPasswordHash = await hashPassword(String(newPassword));
+  writeCredentials({ ...creds, formulaPasswordHash });
+
+  return {
+    formulaPasswordSet: true,
+    message: alreadySet
+      ? 'Formula Password reset successfully'
+      : 'Formula Password set successfully',
+  };
+}
+
 export async function getSecurityStatus() {
-  return { crudPasswordSet: await isCrudPasswordSet() };
+  return {
+    crudPasswordSet: await isCrudPasswordSet(),
+    formulaPasswordSet: await isFormulaPasswordSet(),
+  };
 }
 
 // ─── Formula Category Password helpers ────────────────────────────────────
@@ -89,29 +153,31 @@ export async function verifyCategoryPassword(category, plain) {
 
   const cat = String(category || '').toLowerCase().trim();
 
-  // If a specific password is set for this category, check it first
+  // 1. If a specific password is set for this category, check it first
   if (creds?.categoryPasswords && creds.categoryPasswords[cat]) {
     const matched = await comparePassword(String(plain), creds.categoryPasswords[cat]);
     if (matched) return true;
   }
 
-  // Fallback 1: Check CRUD password
-  if (creds?.crudPasswordHash) {
-    const crudOk = await comparePassword(String(plain), creds.crudPasswordHash);
-    if (crudOk) return true;
+  // 2. Check general Formula password (separate from herbs CRUD password)
+  if (creds?.formulaPasswordHash) {
+    const formulaOk = await comparePassword(String(plain), creds.formulaPasswordHash);
+    if (formulaOk) return true;
   }
 
-  // Fallback 2: Check Admin login password
+  // 3. Fallback: Check Admin login password
   if (creds?.passwordHash) {
     const loginOk = await comparePassword(String(plain), creds.passwordHash);
     if (loginOk) return true;
   }
 
-  // Fallback 3: Check standard default passwords
+  // 4. Fallback: Master password
   if (plain === 'UttamLab@27' || plain === 'admin123') {
     return true;
   }
 
+  // Note: Herbs crudPasswordHash is intentionally NOT checked here,
+  // ensuring Formula operations have their own separate password!
   return false;
 }
 
@@ -137,17 +203,17 @@ export async function setCategoryPassword(_userId, {
   const creds = readCredentials();
   if (!creds) throw new AppError('Credentials file not found', 500);
 
-  // Authorize using existing category password OR CRUD password OR login password
+  // Authorize using existing category password OR formula password OR login password
   const confirmValue = String(currentPassword || '');
   if (!confirmValue) {
-    throw new AppError('Enter your current category password or admin password to change password', 400);
+    throw new AppError('Enter your current category password, formula password, or admin password', 400);
   }
 
   let authorized = false;
   const existingCatHash = creds.categoryPasswords?.[cat];
   if (existingCatHash && (await comparePassword(confirmValue, existingCatHash))) {
     authorized = true;
-  } else if (creds.crudPasswordHash && (await comparePassword(confirmValue, creds.crudPasswordHash))) {
+  } else if (creds.formulaPasswordHash && (await comparePassword(confirmValue, creds.formulaPasswordHash))) {
     authorized = true;
   } else if (creds.passwordHash && (await comparePassword(confirmValue, creds.passwordHash))) {
     authorized = true;

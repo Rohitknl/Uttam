@@ -256,7 +256,7 @@ export default function BillsPage() {
       setModal(bill.id);
       setError('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to load bill');
+      setError(err.response?.data?.message || 'Failed to load bill');
     }
   };
 
