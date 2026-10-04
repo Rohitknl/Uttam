@@ -697,11 +697,10 @@ export default function BillsPage() {
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    URL.revokeObjectURL(url);
+    const win = window.open('', '_blank');
     if (!win) return;
+    win.document.write(html);
+    win.document.close();
     win.focus();
   };
 

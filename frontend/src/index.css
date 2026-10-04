@@ -66,3 +66,13 @@ input, textarea {
 select {
   cursor: pointer !important;
 }
+
+/* Permanent safety rule: Ensure root app and body never get stuck in non-clickable state */
+body, #root {
+  pointer-events: auto !important;
+}
+
+button, [role="button"], a {
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}

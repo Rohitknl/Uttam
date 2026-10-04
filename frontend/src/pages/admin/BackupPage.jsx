@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { DatabaseBackup, Download, Upload, RefreshCw, FolderOpen, FileSearch, RotateCcw } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Select, Input, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
+import { Card, CardBody, Button, Select, Input, PageHeader, LoadingSpinner, Alert, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { backupApi } from '../../api';
 
@@ -22,6 +22,8 @@ export default function BackupPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -173,7 +175,7 @@ export default function BackupPage() {
     }
   };
 
-  const handleRestore = async () => {
+  const promptRestore = () => {
     const targetFile = customRestoreFile || selectedBackup;
     if (!targetFile) {
       setError('Select a backup file to restore');
@@ -183,17 +185,23 @@ export default function BackupPage() {
       setError('Enter Edit/Delete Herb Password to restore a backup');
       return;
     }
-    if (!confirm(`Restore backup "${targetFile}"?\n\nCurrent data will be replaced. A safety copy is saved under _pre_restore.`)) {
-      return;
-    }
+    setError('');
+    setConfirmRestoreOpen(true);
+  };
+
+  const executeRestore = async () => {
+    const targetFile = customRestoreFile || selectedBackup;
+    setConfirmRestoreOpen(false);
     setBusy(true);
     setMessage('');
     setError('');
     try {
       const result = await backupApi.restore(restoreDestinationId, targetFile, restorePassword);
-      setMessage(result.message + ` (${result.restoredFrom})`);
+      setMessage(result.message + ` (${result.restoredFrom}). Reloading application...`);
       setRestorePassword('');
-      setTimeout(() => window.location.reload(), 1200);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Restore failed');
     } finally {
@@ -201,22 +209,27 @@ export default function BackupPage() {
     }
   };
 
-  const handleResetEmpty = async () => {
+  const promptResetEmpty = () => {
     if (!resetPassword.trim()) {
       setError('Enter Edit/Delete Herb Password to reset all application data');
       return;
     }
-    if (!confirm('Are you sure you want to reset all data to empty?\\n\\nThis will delete all herbs, medicines, supplier bills, and orders. A safety backup will be automatically saved under _pre_reset.')) {
-      return;
-    }
+    setError('');
+    setConfirmResetOpen(true);
+  };
+
+  const executeResetEmpty = async () => {
+    setConfirmResetOpen(false);
     setBusy(true);
     setMessage('');
     setError('');
     try {
       const result = await backupApi.resetEmpty(resetPassword);
-      setMessage(result.message);
+      setMessage(result.message + '. Reloading application...');
       setResetPassword('');
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Reset failed');
     } finally {
@@ -385,7 +398,7 @@ export default function BackupPage() {
             />
             <Button
               variant="saffron"
-              onClick={handleRestore}
+              onClick={promptRestore}
               disabled={busy || (!selectedBackup && !customRestoreFile)}
               className="w-full"
             >
@@ -419,7 +432,7 @@ export default function BackupPage() {
               </div>
               <Button
                 variant="danger"
-                onClick={handleResetEmpty}
+                onClick={promptResetEmpty}
                 disabled={busy || !resetPassword.trim()}
                 className="whitespace-nowrap"
               >
@@ -430,6 +443,60 @@ export default function BackupPage() {
           </CardBody>
         </Card>
       </div>
+
+      {/* Confirmation Modal for Restore */}
+      <Modal
+        open={confirmRestoreOpen}
+        onClose={() => setConfirmRestoreOpen(false)}
+        title="Confirm Backup Restore"
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmRestoreOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="saffron" onClick={executeRestore} disabled={busy}>
+              {busy ? 'Restoring...' : 'Yes, Restore Backup'}
+            </Button>
+          </div>
+        )}
+      >
+        <div className="space-y-3 py-2 text-sm text-ink">
+          <p>
+            Are you sure you want to restore backup <strong>&quot;{customRestoreFile || selectedBackup}&quot;</strong>?
+          </p>
+          <div className="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs leading-relaxed">
+            <strong>Warning:</strong> Current inventory and records will be replaced. A safety snapshot will automatically be archived in <code>_pre_restore</code> before applying changes.
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Modal for Reset */}
+      <Modal
+        open={confirmResetOpen}
+        onClose={() => setConfirmResetOpen(false)}
+        title="Confirm Complete Database Reset"
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmResetOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={executeResetEmpty} disabled={busy}>
+              {busy ? 'Resetting...' : 'Yes, Clear All Data'}
+            </Button>
+          </div>
+        )}
+      >
+        <div className="space-y-3 py-2 text-sm text-ink">
+          <p>
+            Are you sure you want to permanently reset all application data to empty?
+          </p>
+          <div className="p-3 bg-red-50 text-red-900 border border-red-200 rounded-lg text-xs leading-relaxed">
+            <strong>Critical:</strong> This will erase all raw herbs, medicines, supplier bills, formulas, and dealer orders. A safety backup will be created in <code>_pre_reset</code> prior to wiping.
+          </div>
+        </div>
+      </Modal>
     </Layout>
   );
 }

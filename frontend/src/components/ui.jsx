@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 
@@ -448,19 +448,83 @@ export function Badge({ children, variant = 'default' }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${variants[variant]}`}>{children}</span>;
 }
 
+/** ErrorBoundary that auto-closes the modal if children crash */
+class ModalErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(err) {
+    console.error('[Modal] Child render error — auto-closing modal:', err);
+    // Auto-close the modal after a tick so the parent can clean up
+    setTimeout(() => {
+      if (this.props.onClose) this.props.onClose();
+    }, 0);
+  }
+  componentDidUpdate(prevProps) {
+    // Reset error state when modal is re-opened with new children
+    if (this.state.hasError && this.props.resetKey !== prevProps.resetKey) {
+      this.setState({ hasError: false });
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
+          Something went wrong displaying this content. The modal will close automatically.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function Modal({ open, onClose, title, children, size = 'md', scrollable = true, footer }) {
+  // Safety: force-clean pointer-events on document.body when modal mounts/unmounts
+  useEffect(() => {
+    if (!open) return;
+    // Some libraries or race conditions can set pointer-events: none on body
+    // Always ensure it's reset when our modal is active and when it closes
+    const cleanup = () => {
+      if (document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+      const root = document.getElementById('root');
+      if (root && root.style.pointerEvents === 'none') {
+        root.style.pointerEvents = '';
+      }
+    };
+    return cleanup;
+  }, [open]);
+
   if (!open) return null;
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-5xl' };
-  return (
+
+  const safeClose = () => {
+    try {
+      if (onClose) onClose();
+    } catch (err) {
+      console.error('[Modal] onClose error:', err);
+    }
+    // Safety: always clean up pointer-events regardless
+    if (document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = '';
+    }
+  };
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40" onClick={safeClose} />
       <div
         className={`relative bg-white rounded-xl shadow-xl w-full ${sizes[size]} flex flex-col overflow-hidden`}
         style={{ maxHeight: 'calc(100vh - 1.5rem)' }}
       >
         <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-line">
           <h3 className="font-display text-lg font-semibold">{title}</h3>
-          <button type="button" onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
+          <button type="button" onClick={safeClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
         <div
           className={`px-5 py-3 min-h-0 ${
@@ -469,7 +533,9 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
               : 'overflow-visible'
           }`}
         >
-          {children}
+          <ModalErrorBoundary onClose={safeClose} resetKey={title}>
+            {children}
+          </ModalErrorBoundary>
         </div>
         {footer && (
           <div className="shrink-0 w-full px-5 py-3 border-t border-line bg-white">
@@ -477,7 +543,8 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

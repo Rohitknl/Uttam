@@ -24,8 +24,8 @@ const adminNav = [
     subClasses: [
       { to: '/admin/formula?tab=view', icon: Eye, label: 'View Formula', tab: 'view' },
       { to: '/admin/formula?tab=edit', icon: Edit3, label: 'Add / Edit Formula', tab: 'edit' },
-      { to: '/admin/formula?tab=delete', icon: Trash2, label: 'Delete Formula', tab: 'delete' },
       { to: '/admin/formula?tab=print', icon: Printer, label: 'Print Formula', tab: 'print' },
+      { to: '/admin/formula?tab=delete', icon: Trash2, label: 'Delete Formula', tab: 'delete' },
     ],
   },
   { to: '/admin/backup', icon: DatabaseBackup, label: 'Backup & Restore', adminOnly: true },
@@ -85,7 +85,7 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
               const isExpanded = expandedMenus[item.to] ?? true;
               const searchParams = new URLSearchParams(location.search);
               const tabParam = searchParams.get('tab');
-              const currentTab = ['view', 'edit', 'delete', 'print'].includes(tabParam)
+              const currentTab = ['view', 'edit', 'print', 'delete'].includes(tabParam)
                 ? tabParam
                 : (tabParam === 'define' ? 'edit' : (tabParam === 'generate' ? 'print' : 'view'));
 
@@ -125,9 +125,6 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
 
                   {isExpanded && (
                     <div className="mt-1 mb-1.5 ml-4 pl-3 border-l border-white/20 space-y-0.5">
-                      <div className="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/40">
-                        Sub Classes
-                      </div>
                       {item.subClasses.map((sub) => {
                         const isSubActive = isParentPath && currentTab === sub.tab;
                         const SubIcon = sub.icon;

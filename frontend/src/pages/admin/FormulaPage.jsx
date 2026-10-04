@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle, Lock, Unlock, Key } from 'lucide-react';
 import Layout from '../../components/Layout';
@@ -147,7 +147,7 @@ export default function FormulaPage() {
   const { canWrite, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const activeTab = ['view', 'edit', 'delete', 'print'].includes(tabParam)
+  const activeTab = ['view', 'edit', 'print', 'delete'].includes(tabParam)
     ? tabParam
     : (tabParam === 'define' ? 'edit' : (tabParam === 'generate' ? 'print' : 'view'));
 
@@ -199,8 +199,8 @@ export default function FormulaPage() {
   const CATEGORY_NAMES = {
     view: 'View Formula',
     edit: 'Add / Edit Formula',
-    delete: 'Delete Formula',
     print: 'Generate/Print Formula',
+    delete: 'Delete Formula',
   };
 
   const CATEGORY_DESCRIPTIONS = {
@@ -219,7 +219,14 @@ export default function FormulaPage() {
     setPasswordError('');
     try {
       await settingsApi.verifyCategoryPassword(category, passwordInput);
-      setUnlockedCategories(prev => ({ ...prev, [category]: true }));
+      setUnlockedCategories(prev => ({
+        ...prev,
+        [category]: true,
+        view: true,
+        edit: true,
+        print: true,
+        delete: prev.delete || category === 'delete',
+      }));
       setPasswordInput('');
       setPasswordError('');
     } catch (err) {
@@ -344,6 +351,13 @@ export default function FormulaPage() {
     setMedicineOptions(buildOptions(Array.isArray(codes) ? codes : []));
   };
 
+  const herbsRef = useRef(herbs);
+  herbsRef.current = herbs;
+  const herbOptionsRef = useRef(herbOptions);
+  herbOptionsRef.current = herbOptions;
+  const medicineOptionsRef = useRef(medicineOptions);
+  medicineOptionsRef.current = medicineOptions;
+
   useEffect(() => {
     loadLists().finally(() => setLoading(false));
   }, []);
@@ -375,11 +389,12 @@ export default function FormulaPage() {
         setBaseFormulaUnit(unit);
         setGenerateUnit(unit);
         setGenerateQuantity(String(data.formulaQuantity ?? 1));
-        setRecipe(items.map(r => {
-          const herb = herbs.find(h => h.id === r.herbId);
-          const opt = herbOptions.find(o => o.herbId === r.herbId)
-            || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
+        setRecipe(items.map((r, i) => {
+          const herb = herbsRef.current.find(h => h.id === r.herbId);
+          const opt = herbOptionsRef.current.find(o => o.herbId === r.herbId)
+            || herbOptionsRef.current.find(o => o.herbCodeId === herb?.herbCodeId);
           return {
+            _key: r.id ? `server-${r.id}` : `recipe-${i}-${Date.now()}`,
             herbId: String(r.herbId),
             herbCodeId: opt ? String(opt.herbCodeId) : (herb?.herbCodeId ? String(herb.herbCodeId) : ''),
             herbName: r.herbName || herb?.name || opt?.name || '',
@@ -389,7 +404,7 @@ export default function FormulaPage() {
         }));
       })
       .catch(() => {
-        const opt = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
+        const opt = medicineOptionsRef.current.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
         setHasRecipe(false);
         setFormulaQuantity('1');
         const unit = opt?.formulaUnit || 'PIECES';
@@ -401,7 +416,32 @@ export default function FormulaPage() {
         setGenerateQuantity('1');
         setRecipe([]);
       });
-  }, [selectedMedicineCodeId, herbs, herbOptions, medicineOptions]);
+  }, [selectedMedicineCodeId]);
+
+  useEffect(() => {
+    if (herbOptions.length > 0 && recipe.length > 0) {
+      setRecipe(prev => {
+        let changed = false;
+        const updated = prev.map(item => {
+          if ((!item.herbCodeId || !item.herbName) && item.herbId) {
+            const herb = herbs.find(h => h.id === parseInt(item.herbId, 10));
+            const opt = herbOptions.find(o => o.herbId === parseInt(item.herbId, 10))
+              || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
+            if (opt || herb) {
+              changed = true;
+              return {
+                ...item,
+                herbCodeId: item.herbCodeId || (opt ? String(opt.herbCodeId) : (herb?.herbCodeId ? String(herb.herbCodeId) : '')),
+                herbName: item.herbName || herb?.name || opt?.name || '',
+              };
+            }
+          }
+          return item;
+        });
+        return changed ? updated : prev;
+      });
+    }
+  }, [herbOptions, herbs]);
 
   useEffect(() => {
     if (activeTab === 'print' && selectedMedicineCodeId && hasRecipe && !generating) {
@@ -424,7 +464,19 @@ export default function FormulaPage() {
     setSelectedMedicineCodeId(medicineCodeId ? String(medicineCodeId) : '');
   };
 
-  const addItem = () => setRecipe([...recipe, { herbId: '', herbCodeId: '', quantity: '', unit: '' }]);
+  const addItem = () => {
+    setRecipe(prev => [
+      ...prev,
+      {
+        _key: `new-${Date.now()}-${Math.random()}`,
+        herbId: '',
+        herbCodeId: '',
+        herbName: '',
+        quantity: '',
+        unit: '',
+      },
+    ]);
+  };
 
   const resolveHerbFromOption = async (opt) => {
     if (!opt) return null;
@@ -449,10 +501,14 @@ export default function FormulaPage() {
   };
 
   const selectHerbForRow = async (idx, herbCodeId) => {
-    const updated = [...recipe];
     if (!herbCodeId) {
-      updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', unit: '' };
-      setRecipe(updated);
+      setRecipe(prev => {
+        const updated = [...prev];
+        if (updated[idx]) {
+          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbName: '', unit: '' };
+        }
+        return updated;
+      });
       return;
     }
     const alreadyUsed = recipe.some((r, i) => i !== idx && String(r.herbCodeId) === String(herbCodeId));
@@ -470,13 +526,18 @@ export default function FormulaPage() {
           return;
         }
       }
-      updated[idx] = {
-        ...updated[idx],
-        herbCodeId: String(herbCodeId),
-        herbId: herb ? String(herb.id) : '',
-        unit: normalizeHerbUnit(herb || { unitOfMeasure: opt?.unit }, opt?.unit),
-      };
-      setRecipe(updated);
+      setRecipe(prev => {
+        const updated = [...prev];
+        if (!updated[idx]) return prev;
+        updated[idx] = {
+          ...updated[idx],
+          herbCodeId: String(herbCodeId),
+          herbId: herb ? String(herb.id) : '',
+          herbName: herb?.name || opt?.name || updated[idx]?.herbName || '',
+          unit: normalizeHerbUnit(herb || { unitOfMeasure: opt?.unit }, opt?.unit),
+        };
+        return updated;
+      });
       setMessage('');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Failed to open herb for this code');
@@ -484,16 +545,19 @@ export default function FormulaPage() {
   };
 
   const updateItem = (idx, field, value) => {
-    const updated = [...recipe];
-    updated[idx] = { ...updated[idx], [field]: value };
-    if (field === 'unit') {
-      const herb = herbs.find(h => h.id === parseInt(updated[idx].herbId, 10));
-      updated[idx].unit = normalizeHerbUnit(herb, value);
-    }
-    setRecipe(updated);
+    setRecipe(prev => {
+      const updated = [...prev];
+      if (!updated[idx]) return prev;
+      updated[idx] = { ...updated[idx], [field]: value };
+      if (field === 'unit') {
+        const herb = herbs.find(h => h.id === parseInt(updated[idx].herbId, 10));
+        updated[idx].unit = normalizeHerbUnit(herb, value);
+      }
+      return updated;
+    });
   };
 
-  const removeItem = (idx) => setRecipe(recipe.filter((_, i) => i !== idx));
+  const removeItem = (idx) => setRecipe(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
     setMessage('');
@@ -728,11 +792,10 @@ export default function FormulaPage() {
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    URL.revokeObjectURL(url);
+    const win = window.open('', '_blank');
     if (!win) return;
+    win.document.write(html);
+    win.document.close();
     win.focus();
   };
 
@@ -1163,6 +1226,19 @@ export default function FormulaPage() {
                         <Edit3 className="w-3.5 h-3.5" /> {hasRecipe ? 'Edit Formula' : 'Add Formula'}
                       </Button>
                     )}
+                    {canWrite && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setActiveTab('edit');
+                          addItem();
+                        }}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Herb
+                      </Button>
+                    )}
                     {hasRecipe && (
                       <Button
                         size="sm"
@@ -1199,6 +1275,22 @@ export default function FormulaPage() {
                   <div className="space-y-3">
                     <Table columns={viewColumns} data={recipe} />
 
+                    {canWrite && (
+                      <div className="flex justify-end pt-1">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setActiveTab('edit');
+                            addItem();
+                          }}
+                          className="flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Herb to Formula
+                        </Button>
+                      </div>
+                    )}
+
                     {(() => {
                       const medQty = parseFloat(formulaQuantity) || 0;
                       const summed = sumHerbQuantityInUnit(recipe, herbs, formulaUnit);
@@ -1227,7 +1319,11 @@ export default function FormulaPage() {
                     {canWrite && (
                       <Button
                         size="sm"
-                        onClick={() => setActiveTab('edit')}
+                        onClick={() => {
+                          setActiveTab('edit');
+                          if (recipe.length === 0) addItem();
+                        }}
+                        className="flex items-center gap-1.5"
                       >
                         <Plus className="w-4 h-4" /> Add Formula Now
                       </Button>
@@ -1300,15 +1396,6 @@ export default function FormulaPage() {
               />
             </div>
 
-            <Textarea
-              label="Description / Preparation Notes"
-              placeholder={selectedMedicineCodeId ? "Enter formula description, preparation instructions, or notes (optional)..." : "Select a medicine to enter description..."}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              disabled={!canWrite || !selectedMedicineCodeId}
-              rows={2}
-            />
-
             {medicineOptions.length === 0 && (
               <Alert type="info">No medicine codes found. Add codes under Medicine Codes first.</Alert>
             )}
@@ -1328,7 +1415,7 @@ export default function FormulaPage() {
                     const unitSource = herb || (opt ? { unitOfMeasure: opt.unit } : null);
                     const unitOptions = unitSource ? unitsForHerb(unitSource) : [];
                     return (
-                      <div key={idx} className="flex gap-2 items-end">
+                      <div key={item._key || `recipe-item-${idx}`} className="flex gap-2 items-end">
                         <DropdownSelect
                           label={idx === 0 ? 'Herb' : ''}
                           searchable
@@ -1395,10 +1482,20 @@ export default function FormulaPage() {
                   );
                 })()}
                 {canWrite && (
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={addItem}>Add Herb</Button>
-                    <Button onClick={handleSave} disabled={saving || !selectedMedicineCodeId}>{saving ? 'Saving...' : 'Save Formula'}</Button>
-                  </div>
+                  <>
+                    <Textarea
+                      label="Description / Preparation Notes"
+                      placeholder={selectedMedicineCodeId ? "Enter formula description, preparation instructions, or notes (optional)..." : "Select a medicine to enter description..."}
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      disabled={!canWrite || !selectedMedicineCodeId}
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onClick={addItem}>Add Herb</Button>
+                      <Button onClick={handleSave} disabled={saving || !selectedMedicineCodeId}>{saving ? 'Saving...' : 'Save Formula'}</Button>
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -1634,7 +1731,7 @@ export default function FormulaPage() {
                       <Table columns={generateColumns} data={generated.items} />
                       <div className="flex gap-2 flex-wrap items-center">
                         <Button variant="secondary" onClick={handlePrintGenerated}>
-                          <Printer className="w-4 h-4" /> Print Formula Sheet
+                          <Printer className="w-4 h-4" /> Print Formula
                         </Button>
                         {isAdmin && (
                           <Button
