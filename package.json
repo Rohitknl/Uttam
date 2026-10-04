@@ -12,10 +12,11 @@
     "dist:dir": "node scripts/prepare-desktop.mjs && npx electron-builder --win dir"
   },
   "devDependencies": {
-    "electron": "^37.2.6",
+    "electron": "37.2.6",
     "electron-builder": "^26.0.12"
   },
   "build": {
+    "electronVersion": "37.2.6",
     "appId": "com.uttamlaboratory.lifecycle",
     "productName": "Uttam Laboratory",
     "copyright": "Copyright © Uttam Laboratory",
