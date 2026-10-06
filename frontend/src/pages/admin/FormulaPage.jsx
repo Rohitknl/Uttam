@@ -177,6 +177,8 @@ export default function FormulaPage() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSpecificMedId, setPrintSpecificMedId] = useState('');
   const [printingFormula, setPrintingFormula] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [consumeConfirmOpen, setConsumeConfirmOpen] = useState(false);
 
   // Category password protection state
   const [unlockedCategories, setUnlockedCategories] = useState({
@@ -485,11 +487,19 @@ export default function FormulaPage() {
   const resolveHerbFromOption = (opt) => {
     if (!opt) return null;
     if (opt.herbId) {
-      const found = herbs.find(h => h.id === parseInt(opt.herbId, 10));
+      const found = herbs.find(h => String(h.id) === String(opt.herbId));
       if (found) return found;
     }
-    if (typeof opt.herbCodeId === 'number') {
-      const found = herbs.find(h => h.herbCodeId === opt.herbCodeId);
+    if (opt.herbCodeId) {
+      const found = herbs.find(h => h.herbCodeId && String(h.herbCodeId) === String(opt.herbCodeId));
+      if (found) return found;
+    }
+    if (opt.code) {
+      const found = herbs.find(h => h.herbCode && String(h.herbCode).trim().toUpperCase() === String(opt.code).trim().toUpperCase());
+      if (found) return found;
+    }
+    if (opt.name) {
+      const found = herbs.find(h => h.name && String(h.name).trim().toUpperCase() === String(opt.name).trim().toUpperCase());
       if (found) return found;
     }
     return null;
@@ -512,19 +522,41 @@ export default function FormulaPage() {
       return;
     }
     const opt = herbOptions.find(o => String(o.herbCodeId) === String(herbCodeId));
-    const herb = resolveHerbFromOption(opt);
+    let herb = resolveHerbFromOption(opt);
+
+    // If herb code exists but has not been added to store yet, automatically ensure it in store!
+    if (!herb && opt) {
+      const rawCodeId = parseInt(opt.herbCodeId, 10);
+      if (Number.isInteger(rawCodeId) && rawCodeId > 0) {
+        try {
+          const createdHerb = await herbsApi.ensureFromCode(rawCodeId);
+          if (createdHerb) {
+            herb = createdHerb;
+            setHerbs(prev => {
+              const exists = prev.some(h => h.id === createdHerb.id);
+              return exists ? prev : [...prev, createdHerb];
+            });
+            setHerbOptions(prev => prev.map(o => {
+              if (String(o.herbCodeId) === String(opt.herbCodeId)) {
+                return {
+                  ...o,
+                  herbId: createdHerb.id,
+                  unit: createdHerb.unitOfMeasure || o.unit,
+                  stock: createdHerb.currentStock ?? 0,
+                };
+              }
+              return o;
+            }));
+          }
+        } catch (err) {
+          console.warn('ensureHerbFromCode notice:', err);
+        }
+      }
+    }
 
     if (!herb) {
-      const err = 'Herb does not exist in Store.';
+      const err = `Herb "${opt?.name || 'Selected herb'}" does not exist in Store. Please add it on the Herbs page.`;
       setMessage(err);
-      alert(err);
-      setRecipe(prev => {
-        const updated = [...prev];
-        if (updated[idx]) {
-          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbName: '', unit: '', quantity: '' };
-        }
-        return updated;
-      });
       return;
     }
 
@@ -547,6 +579,15 @@ export default function FormulaPage() {
       return updated;
     });
     setMessage('');
+
+    // Automatically place cursor into the Quantity input so user can immediately type
+    setTimeout(() => {
+      const qtyInput = document.querySelector(`input[data-recipe-qty="${idx}"]`);
+      if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select?.();
+      }
+    }, 50);
   };
 
   const updateItem = (idx, field, value) => {
@@ -604,13 +645,6 @@ export default function FormulaPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `You are adding medicine for ${medLabel}.\n`
-      + `Herbs added: ${herbLabel}.\n\n`
-      + 'Save this formula?',
-    );
-    if (!confirmed) return;
-
     setSaving(true);
     try {
       const items = [];
@@ -625,11 +659,18 @@ export default function FormulaPage() {
           return;
         }
         seen.add(herbId);
-        const herb = herbs.find(h => h.id === herbId);
+        let herb = herbs.find(h => h.id === herbId);
+        if (!herb && r.herbCodeId) {
+          const rawCodeId = parseInt(r.herbCodeId, 10);
+          if (Number.isInteger(rawCodeId) && rawCodeId > 0) {
+            try {
+              herb = await herbsApi.ensureFromCode(rawCodeId);
+            } catch {}
+          }
+        }
         if (!herb) {
-          const err = 'Herb does not exist in Store.';
+          const err = `Herb "${r.herbName || herbId}" does not exist in Store. Please add it on the Herbs page.`;
           setMessage(err);
-          alert(err);
           setSaving(false);
           return;
         }
@@ -642,7 +683,7 @@ export default function FormulaPage() {
         const qty = parseFloat(r.quantity) || 0;
         if (!(qty > 0)) continue;
         items.push({
-          herbId,
+          herbId: herb.id,
           quantity: qty,
           unit,
         });
@@ -674,15 +715,17 @@ export default function FormulaPage() {
     }
   };
 
-  const handleDeleteFormula = async () => {
+  const handleDeleteFormula = () => {
+    if (!selectedMedicineCodeId) return;
+    setDeleteConfirmOpen(true);
+  };
+
+  const executeDeleteFormula = async () => {
     if (!selectedMedicineCodeId) return;
     const selected = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
     const medName = selected ? `${selected.code} — ${selected.name}` : 'this medicine';
 
-    if (!window.confirm(`Are you sure you want to delete the formula for ${medName}?\n\nThis will remove all ingredients from the formula. The medicine code itself will not be deleted.`)) {
-      return;
-    }
-
+    setDeleteConfirmOpen(false);
     setSaving(true);
     setMessage('');
     try {
@@ -801,16 +844,13 @@ export default function FormulaPage() {
     printHtml(html);
   };
 
-  const handleConsume = async () => {
+  const handleConsume = () => {
     if (!generated?.items?.length) return;
+    setConsumeConfirmOpen(true);
+  };
 
-    const hasShortage = generated.sufficient === false || generated.items.some(it => it.sufficient === false);
-    const confirmMsg = hasShortage
-      ? 'Some herbs have insufficient stock and consuming will turn their stock negative. Continue?'
-      : 'This will deduct herb stock. Continue?';
-
-    if (!confirm(confirmMsg)) return;
-
+  const executeConsume = async () => {
+    setConsumeConfirmOpen(false);
     setGenerating(true);
     setMessage('');
     try {
@@ -882,7 +922,7 @@ export default function FormulaPage() {
       }
 
       if (!recipeData.length) {
-        alert(`No formula ingredients configured for ${med?.code || 'this medicine'}.`);
+        setMessage(`No formula ingredients configured for ${med?.code || 'this medicine'}.`);
         return;
       }
 
@@ -966,7 +1006,7 @@ export default function FormulaPage() {
       printHtml(html);
     } catch (err) {
       console.error(err);
-      alert('Failed to load formula recipe for printing.');
+      setMessage('Failed to load formula recipe for printing.');
     } finally {
       setPrintingFormula(false);
     }
@@ -1654,10 +1694,12 @@ export default function FormulaPage() {
                           ]}
                         />
                         <Input
+                          data-recipe-qty={idx}
                           label={idx === 0 ? 'Herb Qty' : ''}
                           type="number"
                           min="0"
                           step="0.0001"
+                          placeholder="Qty"
                           value={item.quantity}
                           onChange={e => updateItem(idx, 'quantity', e.target.value)}
                           className="w-32"
@@ -2163,6 +2205,65 @@ export default function FormulaPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Formula Confirmation Modal */}
+      <Modal
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Delete Formula Confirmation"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink">
+            Are you sure you want to delete the formula for{' '}
+            <strong>
+              {medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId))?.code || 'this medicine'}
+            </strong>?
+          </p>
+          <p className="text-xs text-muted">
+            This will remove all herb ingredients configured in the formula. The medicine code itself will not be deleted.
+          </p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-line">
+            <Button variant="secondary" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={executeDeleteFormula} disabled={saving}>
+              {saving ? 'Deleting...' : 'Delete Formula'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Consume Herbs Confirmation Modal */}
+      <Modal
+        open={consumeConfirmOpen}
+        onClose={() => setConsumeConfirmOpen(false)}
+        title="Confirm Consume Herbs"
+        size="md"
+      >
+        <div className="space-y-4">
+          {generated?.sufficient === false || generated?.items?.some(it => it.sufficient === false) ? (
+            <Alert type="error">
+              Some herbs have insufficient stock. Consuming will reduce their available inventory into negative numbers.
+            </Alert>
+          ) : (
+            <p className="text-sm text-ink">
+              This will deduct the required herb quantities directly from current stock.
+            </p>
+          )}
+          <p className="text-xs text-muted">
+            Are you sure you want to proceed with consuming these herbs?
+          </p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-line">
+            <Button variant="secondary" onClick={() => setConsumeConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={executeConsume} disabled={generating}>
+              {generating ? 'Processing...' : 'Confirm Consume'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </Layout>
   );
