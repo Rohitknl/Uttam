@@ -22,8 +22,8 @@ const adminNav = [
     icon: FlaskConical,
     label: 'Formula',
     subClasses: [
-      { to: '/admin/formula?tab=view', icon: Eye, label: 'View Formula', tab: 'view' },
       { to: '/admin/formula?tab=edit', icon: Edit3, label: 'Add / Edit Formula', tab: 'edit' },
+      { to: '/admin/formula?tab=view', icon: Eye, label: 'View Formula', tab: 'view' },
       { to: '/admin/formula?tab=print', icon: Printer, label: 'Print Formula', tab: 'print' },
       { to: '/admin/formula?tab=delete', icon: Trash2, label: 'Delete Formula', tab: 'delete' },
     ],
@@ -63,12 +63,16 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-forest-950 text-white flex flex-col z-40">
-        <div className="px-6 py-5 border-b border-white/10">
+        <div className="px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <Package className="w-8 h-8 text-saffron-500" />
+            <img
+              src="/logo.jpg"
+              alt="Uttam Laboratories"
+              className="w-11 h-11 rounded-full object-cover shadow-sm ring-1 ring-amber-400/40 shrink-0"
+            />
             <div>
-              <h1 className="font-display text-lg font-bold leading-tight">Uttam Laboratories</h1>
-              <p className="text-xs text-white/50">Ayurvedic Inventory</p>
+              <h1 className="font-display text-base font-bold leading-tight">Uttam Laboratories</h1>
+              <p className="text-xs text-white/60">Ayurvedic Inventory</p>
             </div>
           </div>
         </div>

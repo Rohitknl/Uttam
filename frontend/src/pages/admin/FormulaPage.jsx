@@ -5,6 +5,7 @@ import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi, settingsApi } from '../../api';
+import { printHtml } from '../../utils/print';
 
 const UNITS = ['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES'];
 
@@ -147,9 +148,9 @@ export default function FormulaPage() {
   const { canWrite, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const activeTab = ['view', 'edit', 'print', 'delete'].includes(tabParam)
+  const activeTab = ['edit', 'view', 'print', 'delete'].includes(tabParam)
     ? tabParam
-    : (tabParam === 'define' ? 'edit' : (tabParam === 'generate' ? 'print' : 'view'));
+    : (tabParam === 'define' ? 'edit' : (tabParam === 'generate' ? 'print' : 'edit'));
 
   const [medicineOptions, setMedicineOptions] = useState([]);
   const [herbs, setHerbs] = useState([]);
@@ -173,6 +174,9 @@ export default function FormulaPage() {
   const [batchNumber, setBatchNumber] = useState('');
   const [firmName, setFirmName] = useState('');
   const [overviewSearch, setOverviewSearch] = useState('');
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printSpecificMedId, setPrintSpecificMedId] = useState('');
+  const [printingFormula, setPrintingFormula] = useState(false);
 
   // Category password protection state
   const [unlockedCategories, setUnlockedCategories] = useState({
@@ -288,7 +292,7 @@ export default function FormulaPage() {
     setMessage('');
     setPasswordInput('');
     setPasswordError('');
-    setSearchParams(tab === 'view' ? {} : { tab });
+    setSearchParams(tab === 'edit' ? {} : { tab });
   };
 
   useEffect(() => {
@@ -478,26 +482,17 @@ export default function FormulaPage() {
     ]);
   };
 
-  const resolveHerbFromOption = async (opt) => {
+  const resolveHerbFromOption = (opt) => {
     if (!opt) return null;
     if (opt.herbId) {
-      return herbs.find(h => h.id === opt.herbId) || {
-        id: opt.herbId,
-        name: opt.name,
-        unitOfMeasure: opt.unit,
-        currentStock: opt.stock,
-        herbCodeId: typeof opt.herbCodeId === 'number' ? opt.herbCodeId : null,
-      };
+      const found = herbs.find(h => h.id === parseInt(opt.herbId, 10));
+      if (found) return found;
     }
-    if (!canWrite || typeof opt.herbCodeId !== 'number') return null;
-    const created = await herbsApi.ensureFromCode(opt.herbCodeId);
-    setHerbs(prev => (prev.some(h => h.id === created.id) ? prev : [...prev, created]));
-    setHerbOptions(prev => prev.map(o => (
-      String(o.herbCodeId) === String(opt.herbCodeId)
-        ? { ...o, herbId: created.id, unit: created.unitOfMeasure, stock: created.currentStock, name: created.name }
-        : o
-    )));
-    return created;
+    if (typeof opt.herbCodeId === 'number') {
+      const found = herbs.find(h => h.herbCodeId === opt.herbCodeId);
+      if (found) return found;
+    }
+    return null;
   };
 
   const selectHerbForRow = async (idx, herbCodeId) => {
@@ -505,7 +500,7 @@ export default function FormulaPage() {
       setRecipe(prev => {
         const updated = [...prev];
         if (updated[idx]) {
-          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbName: '', unit: '' };
+          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbName: '', unit: '', quantity: '' };
         }
         return updated;
       });
@@ -517,31 +512,41 @@ export default function FormulaPage() {
       return;
     }
     const opt = herbOptions.find(o => String(o.herbCodeId) === String(herbCodeId));
-    try {
-      const herb = await resolveHerbFromOption(opt);
-      if (herb?.id) {
-        const herbAlreadyUsed = recipe.some((r, i) => i !== idx && String(r.herbId) === String(herb.id));
-        if (herbAlreadyUsed) {
-          setMessage(`Herb "${herb.name}" is already in the formula. Each herb can be added only once.`);
-          return;
-        }
-      }
+    const herb = resolveHerbFromOption(opt);
+
+    if (!herb) {
+      const err = 'Herb does not exist in Store.';
+      setMessage(err);
+      alert(err);
       setRecipe(prev => {
         const updated = [...prev];
-        if (!updated[idx]) return prev;
-        updated[idx] = {
-          ...updated[idx],
-          herbCodeId: String(herbCodeId),
-          herbId: herb ? String(herb.id) : '',
-          herbName: herb?.name || opt?.name || updated[idx]?.herbName || '',
-          unit: normalizeHerbUnit(herb || { unitOfMeasure: opt?.unit }, opt?.unit),
-        };
+        if (updated[idx]) {
+          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbName: '', unit: '', quantity: '' };
+        }
         return updated;
       });
-      setMessage('');
-    } catch (err) {
-      setMessage(err.response?.data?.message || 'Failed to open herb for this code');
+      return;
     }
+
+    const herbAlreadyUsed = recipe.some((r, i) => i !== idx && String(r.herbId) === String(herb.id));
+    if (herbAlreadyUsed) {
+      setMessage(`Herb "${herb.name}" is already in the formula. Each herb can be added only once.`);
+      return;
+    }
+
+    setRecipe(prev => {
+      const updated = [...prev];
+      if (!updated[idx]) return prev;
+      updated[idx] = {
+        ...updated[idx],
+        herbCodeId: String(herbCodeId),
+        herbId: String(herb.id),
+        herbName: herb.name || opt?.name || '',
+        unit: normalizeHerbUnit(herb, opt?.unit),
+      };
+      return updated;
+    });
+    setMessage('');
   };
 
   const updateItem = (idx, field, value) => {
@@ -622,7 +627,9 @@ export default function FormulaPage() {
         seen.add(herbId);
         const herb = herbs.find(h => h.id === herbId);
         if (!herb) {
-          setMessage('One or more selected herbs were not found');
+          const err = 'Herb does not exist in Store.';
+          setMessage(err);
+          alert(err);
           setSaving(false);
           return;
         }
@@ -788,15 +795,10 @@ export default function FormulaPage() {
     <tbody>${rows}</tbody>
   </table>
   <div class="foot">Computer-generated formula sheet — ${esc(displayFirm)}</div>
-  <script>window.onload = () => window.print();</script>
 </body>
 </html>`;
 
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.focus();
+    printHtml(html);
   };
 
   const handleConsume = async () => {
@@ -833,6 +835,219 @@ export default function FormulaPage() {
     }
   };
 
+  const handlePrintSpecificFormula = async (medId) => {
+    const targetId = medId || selectedMedicineCodeId;
+    if (!targetId) return;
+
+    const med = medicineOptions.find(m => String(m.medicineCodeId) === String(targetId));
+    setPrintingFormula(true);
+    try {
+      let recipeData = [];
+      let baseQty = med?.formulaQuantity ?? 1;
+      let baseUnit = med?.formulaUnit || 'PIECES';
+      let medDesc = med?.description || '';
+
+      if (String(targetId) === String(selectedMedicineCodeId) && recipe.length > 0) {
+        recipeData = recipe.map(r => {
+          const herb = herbs.find(h => String(h.id) === String(r.herbId));
+          const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId))
+            || herbOptions.find(o => String(o.herbId) === String(r.herbId));
+          return {
+            herbCode: opt?.code || herb?.herbCode || '—',
+            herbName: r.herbName || opt?.name || herb?.name || 'Herb',
+            quantity: r.quantity,
+            unit: r.unit,
+          };
+        });
+        baseQty = formulaQuantity;
+        baseUnit = formulaUnit;
+        medDesc = description;
+      } else {
+        const data = await medicineCodesApi.getRecipe(targetId);
+        const items = data.items || [];
+        baseQty = data.formulaQuantity ?? med?.formulaQuantity ?? 1;
+        baseUnit = data.formulaUnit || med?.formulaUnit || 'PIECES';
+        medDesc = data.description || med?.description || '';
+        recipeData = items.map(r => {
+          const herb = herbs.find(h => h.id === r.herbId);
+          const opt = herbOptions.find(o => o.herbId === r.herbId)
+            || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
+          return {
+            herbCode: opt?.code || herb?.herbCode || '—',
+            herbName: r.herbName || herb?.name || opt?.name || 'Herb',
+            quantity: r.quantity ?? '',
+            unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
+          };
+        });
+      }
+
+      if (!recipeData.length) {
+        alert(`No formula ingredients configured for ${med?.code || 'this medicine'}.`);
+        return;
+      }
+
+      const esc = (s) => String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      const code = med?.code || '—';
+      const name = med?.name || '—';
+
+      const rows = recipeData.map((r, i) => `
+        <tr>
+          <td class="c">${i + 1}</td>
+          <td class="code">${esc(r.herbCode)}</td>
+          <td class="bold">${esc(r.herbName)}</td>
+          <td class="r">${esc(r.quantity)} ${esc(r.unit)}</td>
+        </tr>
+      `).join('');
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Formula — ${esc(code)}</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
+    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
+    .sub { color: #5c6b60; margin-bottom: 14px; font-size: 11px; }
+    h1 { font-size: 16px; margin: 0 0 12px; letter-spacing: 0.04em; border-bottom: 2px solid #2d5a3d; padding-bottom: 4px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; background: #f6faf7; padding: 12px; border: 1px solid #d5e0d8; border-radius: 6px; }
+    .meta div span { color: #5c6b60; display: inline-block; min-width: 120px; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #d5e0d8; padding: 7px 10px; }
+    th { background: #e8f2eb; color: #2d5a3d; text-align: left; font-size: 11px; text-transform: uppercase; }
+    tr:nth-child(even) { background: #fafcfa; }
+    .c { text-align: center; } .r { text-align: right; }
+    .code { font-family: monospace; font-weight: 700; color: #2d5a3d; }
+    .bold { font-weight: 600; }
+    .foot { margin-top: 30px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; display: flex; justify-content: space-between; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; font-size: 11px; }
+    .signatures div { border-top: 1px solid #aaa; padding-top: 6px; text-align: center; color: #444; }
+    @media print { body { padding: 0; } @page { margin: 10mm; } }
+  </style>
+</head>
+<body>
+  <div class="brand">Uttam Laboratories</div>
+  <div class="sub">Ayurvedic Stock &amp; Inventory</div>
+  <h1>AYURVEDIC MEDICINE FORMULA SPECIFICATION</h1>
+  <div class="meta">
+    <div><span>Medicine Code</span><strong class="code">${esc(code)}</strong></div>
+    <div><span>Medicine Name</span><strong>${esc(name)}</strong></div>
+    <div><span>Base Formula</span><strong>${esc(baseQty)} ${esc(baseUnit)}</strong></div>
+    <div><span>Total Ingredients</span><strong>${recipeData.length} herbs</strong></div>
+    ${medDesc ? `<div style="grid-column: span 2;"><span>Description / Notes</span><strong>${esc(medDesc)}</strong></div>` : ''}
+    <div><span>Printed Date</span><strong>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="c" style="width: 40px;">#</th>
+        <th style="width: 120px;">Herb Code</th>
+        <th>Herb Name</th>
+        <th class="r" style="width: 150px;">Quantity</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="signatures">
+    <div>Prepared / Checked By</div>
+    <div>Authorized Signatory (Uttam Laboratories)</div>
+  </div>
+  <div class="foot">
+    <span>Formula Specification Sheet — ${esc(code)}</span>
+    <span>Uttam Laboratories</span>
+  </div>
+</body>
+</html>`;
+
+      printHtml(html);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load formula recipe for printing.');
+    } finally {
+      setPrintingFormula(false);
+    }
+  };
+
+  const handlePrintFormulaList = () => {
+    const list = filteredMedicines;
+    const esc = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const configuredCount = list.filter(m => m.hasRecipe).length;
+
+    const rows = list.map((m, idx) => `
+      <tr>
+        <td class="c">${idx + 1}</td>
+        <td class="code">${esc(m.code)}</td>
+        <td class="bold">${esc(m.name)}</td>
+        <td class="c">${esc(m.formulaQuantity ?? 1)} ${esc(m.formulaUnit || 'PIECES')}</td>
+        <td class="c">${m.hasRecipe ? `${m.recipeItemsCount} herbs` : '—'}</td>
+        <td class="c">${m.hasRecipe ? '<span style="color:#2d5a3d;font-weight:600;">Configured</span>' : '<span style="color:#777;">Not Configured</span>'}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Medicine Formulas Directory — Uttam Laboratories</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
+    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
+    .sub { color: #5c6b60; margin-bottom: 12px; font-size: 11px; }
+    h1 { font-size: 15px; margin: 0 0 12px; font-weight: 700; border-bottom: 2px solid #2d5a3d; padding-bottom: 4px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 14px; font-size: 11px; color: #5c6b60; }
+    .meta strong { color: #1c241e; margin-left: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { border: 1px solid #d5e0d8; padding: 6px 8px; text-align: left; }
+    th { background: #e8f2eb; color: #2d5a3d; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+    tr:nth-child(even) { background: #fafcfa; }
+    .c { text-align: center; } .r { text-align: right; }
+    .code { font-family: monospace; font-weight: 700; color: #2d5a3d; }
+    .bold { font-weight: 600; }
+    .foot { margin-top: 24px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; display: flex; justify-content: space-between; }
+    @media print { body { padding: 0; } @page { margin: 10mm; } }
+  </style>
+</head>
+<body>
+  <div class="brand">Uttam Laboratories</div>
+  <div class="sub">Ayurvedic Stock &amp; Inventory</div>
+  <h1>ALL MEDICINE FORMULAS DIRECTORY</h1>
+  <div class="meta">
+    <div>Total Medicine Codes:<strong>${list.length}</strong></div>
+    <div>Configured Formulas:<strong>${configuredCount}</strong></div>
+    <div>Printed Date:<strong>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="c" style="width: 35px;">#</th>
+        <th style="width: 110px;">Medicine Code</th>
+        <th>Medicine Name</th>
+        <th class="c" style="width: 120px;">Base Formula</th>
+        <th class="c" style="width: 100px;">Ingredients</th>
+        <th class="c" style="width: 110px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="foot">
+    <span>Formula Directory — Uttam Laboratories</span>
+    <span>Total: ${list.length} records</span>
+  </div>
+</body>
+</html>`;
+
+    printHtml(html);
+  };
+
   const selectedMedicine = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
 
   const filteredMedicines = medicineOptions.filter(m => {
@@ -845,7 +1060,11 @@ export default function FormulaPage() {
     {
       key: 'index',
       label: '#',
-      render: (_, __, idx) => <span className="text-muted font-mono">{idx + 1}</span>,
+      render: (r, idx) => (
+        <span className="text-muted font-mono font-medium">
+          {Number.isFinite(idx) ? idx + 1 : 1}
+        </span>
+      ),
     },
     {
       key: 'herbName',
@@ -891,18 +1110,28 @@ export default function FormulaPage() {
 
   const overviewColumns = [
     {
+      key: 'srNo',
+      label: '#',
+      render: (_, idx) => (
+        <span className="text-muted font-mono text-xs font-semibold">
+          {Number.isFinite(idx) ? idx + 1 : 1}
+        </span>
+      ),
+    },
+    {
       key: 'code',
-      label: 'Code',
-      render: m => <span className="font-mono font-medium text-ink">{m.code}</span>,
+      label: 'Medicine Code',
+      render: (m) => (
+        <span className="font-mono font-bold text-forest-800 hover:text-forest-950 hover:underline cursor-pointer">
+          {m.code}
+        </span>
+      ),
     },
     {
       key: 'name',
       label: 'Medicine Name',
       render: m => (
-        <div>
-          <span className="font-medium text-ink">{m.name}</span>
-          {m.description && <div className="text-xs text-muted line-clamp-1">{m.description}</div>}
-        </div>
+        <span className="font-medium text-ink hover:text-forest-800 cursor-pointer">{m.name}</span>
       ),
     },
     {
@@ -924,37 +1153,30 @@ export default function FormulaPage() {
       label: 'Actions',
       render: m => (
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => selectMedicineCode(m.medicineCodeId)}
-          >
-            <Eye className="w-3.5 h-3.5" /> View
-          </Button>
           {canWrite && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
+              onClick={(e) => {
+                e?.stopPropagation?.();
                 selectMedicineCode(m.medicineCodeId);
                 setActiveTab('edit');
               }}
             >
-              <Edit3 className="w-3.5 h-3.5" /> Edit
+              <Edit3 className="w-3.5 h-3.5" /> {m.hasRecipe ? 'Edit' : 'Add'}
             </Button>
           )}
-          {m.hasRecipe && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                selectMedicineCode(m.medicineCodeId);
-                setActiveTab('print');
-              }}
-            >
-              <Printer className="w-3.5 h-3.5" /> Print
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={(e) => {
+              e?.stopPropagation?.();
+              selectMedicineCode(m.medicineCodeId);
+              setActiveTab('view');
+            }}
+          >
+            <Eye className="w-3.5 h-3.5" /> View
+          </Button>
         </div>
       ),
     },
@@ -962,8 +1184,17 @@ export default function FormulaPage() {
 
   const deleteOverviewColumns = [
     {
+      key: 'srNo',
+      label: '#',
+      render: (_, idx) => (
+        <span className="text-muted font-mono text-xs font-semibold">
+          {Number.isFinite(idx) ? idx + 1 : 1}
+        </span>
+      ),
+    },
+    {
       key: 'code',
-      label: 'Code',
+      label: 'Medicine Code',
       render: m => <span className="font-mono font-medium text-ink">{m.code}</span>,
     },
     {
@@ -998,8 +1229,17 @@ export default function FormulaPage() {
 
   const printOverviewColumns = [
     {
+      key: 'srNo',
+      label: '#',
+      render: (_, idx) => (
+        <span className="text-muted font-mono text-xs font-semibold">
+          {Number.isFinite(idx) ? idx + 1 : 1}
+        </span>
+      ),
+    },
+    {
       key: 'code',
-      label: 'Code',
+      label: 'Medicine Code',
       render: m => <span className="font-mono font-medium text-ink">{m.code}</span>,
     },
     {
@@ -1239,26 +1479,6 @@ export default function FormulaPage() {
                         <Plus className="w-3.5 h-3.5" /> Add Herb
                       </Button>
                     )}
-                    {hasRecipe && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setActiveTab('print')}
-                        className="flex items-center gap-1.5"
-                      >
-                        <Printer className="w-3.5 h-3.5" /> Print Formula
-                      </Button>
-                    )}
-                    {hasRecipe && isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => setActiveTab('delete')}
-                        className="flex items-center gap-1.5"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </Button>
-                    )}
                   </div>
                 </div>
 
@@ -1346,7 +1566,11 @@ export default function FormulaPage() {
                     />
                   </div>
                 </div>
-                <Table columns={overviewColumns} data={filteredMedicines} />
+                <Table
+                  columns={overviewColumns}
+                  data={filteredMedicines}
+                  onRowClick={m => selectMedicineCode(m.medicineCodeId)}
+                />
               </div>
             )}
           </CardBody>
@@ -1358,14 +1582,11 @@ export default function FormulaPage() {
         <Card>
           <CardBody className="space-y-4">
             {selectedMedicineCodeId && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-forest-50 border border-forest-200">
+              <div className="p-3 rounded-lg bg-forest-50 border border-forest-200">
                 <span className="text-sm font-medium text-forest-800">
                   {hasRecipe ? 'Editing Formula for:' : 'Configuring New Formula for:'}{' '}
                   <strong>{selectedMedicine?.code} — {selectedMedicine?.name}</strong>
                 </span>
-                <Button size="sm" variant="outline" onClick={() => setActiveTab('view')}>
-                  <Eye className="w-3.5 h-3.5" /> View Mode
-                </Button>
               </div>
             )}
 
@@ -1428,7 +1649,7 @@ export default function FormulaPage() {
                             { value: '', label: 'Select herb code' },
                             ...herbOptions.map(h => ({
                               value: String(h.herbCodeId),
-                              label: `${h.code} — ${h.name} (${h.unit}) — stock: ${h.stock}`,
+                              label: `${h.code} — ${h.name}${!h.herbId ? ' (Not in Store)' : ` (${h.unit}) — stock: ${h.stock}`}`,
                             })),
                           ]}
                         />
@@ -1751,15 +1972,25 @@ export default function FormulaPage() {
               <div className="space-y-3 pt-2">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-base font-semibold text-ink">Formulas Ready to Print</h3>
-                  <div className="relative w-64">
-                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Search formulas to print..."
-                      value={overviewSearch}
-                      onChange={e => setOverviewSearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-line text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-forest-700/30"
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-64">
+                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search formulas to print..."
+                        value={overviewSearch}
+                        onChange={e => setOverviewSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-line text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-forest-700/30"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPrintModal(true)}
+                      className="flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <Printer className="w-4 h-4" /> Print Options
+                    </Button>
                   </div>
                 </div>
                 {medicineOptions.filter(m => m.hasRecipe).length === 0 ? (
@@ -1779,6 +2010,90 @@ export default function FormulaPage() {
       )}
         </>
       )}
+
+      {/* Print Formulas Modal */}
+      <Modal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title="Print Formulas"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted">
+            Choose whether to print the complete directory list of all medicine formulas or print the detailed recipe specification for an individual medicine.
+          </p>
+
+          {/* Option 1: Print All Formulas List */}
+          <div className="p-4 rounded-xl border border-line bg-surface/40 hover:bg-surface/70 transition-colors">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="font-semibold text-ink text-sm flex items-center gap-2">
+                  <Printer className="w-4 h-4 text-forest-700" /> Print All Formulas (List Directory)
+                </h4>
+                <p className="text-xs text-muted mt-1">
+                  Prints a comprehensive directory table listing all {filteredMedicines.length} medicine codes, base quantities, and configuration status.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowPrintModal(false);
+                  handlePrintFormulaList();
+                }}
+                className="whitespace-nowrap shrink-0"
+              >
+                Print All List
+              </Button>
+            </div>
+          </div>
+
+          {/* Option 2: Print Specific Formula */}
+          <div className="p-4 rounded-xl border border-line bg-surface/40 space-y-3">
+            <div>
+              <h4 className="font-semibold text-ink text-sm flex items-center gap-2">
+                <Printer className="w-4 h-4 text-forest-700" /> Print Specific Formula
+              </h4>
+              <p className="text-xs text-muted mt-1">
+                Select a specific medicine to print its complete recipe card with all ingredient quantities and units.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-1">
+              <DropdownSelect
+                label="Choose Medicine Formula"
+                searchable
+                searchPlaceholder="Search medicine code or name..."
+                placeholder="Choose medicine formula..."
+                value={printSpecificMedId}
+                onChange={val => setPrintSpecificMedId(val)}
+                className="min-w-[240px] flex-1"
+                options={[
+                  { value: '', label: 'Choose medicine formula to print' },
+                  ...medicineOptions.filter(m => m.hasRecipe).map(m => ({
+                    value: String(m.medicineCodeId),
+                    label: `${m.code} — ${m.name} (${m.recipeItemsCount} herbs)`,
+                  })),
+                ]}
+              />
+              <Button
+                size="sm"
+                disabled={!printSpecificMedId || printingFormula}
+                onClick={() => {
+                  setShowPrintModal(false);
+                  handlePrintSpecificFormula(printSpecificMedId);
+                }}
+                className="whitespace-nowrap shrink-0"
+              >
+                {printingFormula ? 'Loading...' : 'Print Formula'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-line">
+            <Button variant="secondary" onClick={() => setShowPrintModal(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Set Category Password Modal */}
       <Modal

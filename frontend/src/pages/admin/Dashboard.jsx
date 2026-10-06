@@ -3,6 +3,7 @@ import { AlertTriangle, Package, Printer } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { Card, CardHeader, CardBody, Badge, Button, LoadingSpinner, PageHeader, Modal } from '../../components/ui';
 import { analyticsApi } from '../../api';
+import { printHtml } from '../../utils/print';
 
 const TILES = {
   lowHerbs: {
@@ -60,14 +61,9 @@ function printList(title, rowsHtml) {
     <tbody>${rowsHtml.body}</tbody>
   </table>
   <div class="foot">${esc(rowsHtml.count)} record(s)</div>
-  <script>window.onload = () => { window.print(); };</script>
 </body>
 </html>`;
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
+  printHtml(html);
 }
 
 function buildPrintRows(type, items) {
@@ -169,16 +165,23 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className={lists.lowHerbs.length > 0 ? 'bg-red-50/50 border-red-300' : ''}>
-          <CardHeader title={<span className={lists.lowHerbs.length > 0 ? 'text-red-700' : ''}>Low Stock Herbs</span>} />
+          <CardHeader title={
+            <span className={`flex items-center gap-2 ${lists.lowHerbs.length > 0 ? 'text-red-700 font-bold' : ''}`}>
+              {lists.lowHerbs.length > 0 && <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />}
+              Low Stock Herbs
+            </span>
+          } />
           <CardBody className="p-0">
             {lists.lowHerbs.length === 0 ? (
               <p className="px-6 py-4 text-muted text-sm">{TILES.lowHerbs.empty}</p>
             ) : (
               <ul className="divide-y divide-line">
                 {lists.lowHerbs.map(h => (
-                  <li key={h.id} className="px-6 py-3 flex justify-between items-center">
+                  <li key={h.id} className="px-6 py-3 flex justify-between items-center bg-red-50/40">
                     <span className="text-sm font-medium text-ink">{h.name}</span>
-                    <Badge variant="danger">{h.currentStock} {h.unitOfMeasure}</Badge>
+                    <span className="blink-badge-danger px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-400">
+                      {h.currentStock} {h.unitOfMeasure}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -187,16 +190,23 @@ export default function AdminDashboard() {
         </Card>
 
         <Card className={lists.lowMedicines.length > 0 ? 'bg-red-50/50 border-red-300' : ''}>
-          <CardHeader title={<span className={lists.lowMedicines.length > 0 ? 'text-red-700' : ''}>Low Stock Medicines</span>} />
+          <CardHeader title={
+            <span className={`flex items-center gap-2 ${lists.lowMedicines.length > 0 ? 'text-red-700 font-bold' : ''}`}>
+              {lists.lowMedicines.length > 0 && <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />}
+              Low Stock Medicines
+            </span>
+          } />
           <CardBody className="p-0">
             {lists.lowMedicines.length === 0 ? (
               <p className="px-6 py-4 text-muted text-sm">{TILES.lowMedicines.empty}</p>
             ) : (
               <ul className="divide-y divide-line">
                 {lists.lowMedicines.map(m => (
-                  <li key={m.id} className="px-6 py-3 flex justify-between items-center">
+                  <li key={m.id} className="px-6 py-3 flex justify-between items-center bg-red-50/40">
                     <span className="text-sm font-medium text-ink">{m.name}</span>
-                    <Badge variant="danger">{m.currentStock}</Badge>
+                    <span className="blink-badge-danger px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-400">
+                      {m.currentStock}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -205,18 +215,23 @@ export default function AdminDashboard() {
         </Card>
 
         <Card className={lists.expiring.length > 0 ? 'bg-red-50/50 border-red-300' : ''}>
-          <CardHeader title={<span className={lists.expiring.length > 0 ? 'text-red-700' : ''}>Expiring Medicines (30 days)</span>} />
+          <CardHeader title={
+            <span className={`flex items-center gap-2 ${lists.expiring.length > 0 ? 'text-red-700 font-bold' : ''}`}>
+              {lists.expiring.length > 0 && <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />}
+              Expiring Medicines (30 days)
+            </span>
+          } />
           <CardBody className="p-0">
             {lists.expiring.length === 0 ? (
               <p className="px-6 py-4 text-muted text-sm">{TILES.expiring.empty}</p>
             ) : (
               <ul className="divide-y divide-line">
                 {lists.expiring.map(m => (
-                  <li key={m.id} className="px-6 py-3 flex justify-between items-center">
+                  <li key={m.id} className="px-6 py-3 flex justify-between items-center bg-amber-50/40">
                     <span className="text-sm font-medium text-ink">{m.name}</span>
-                    <Badge variant={m.expired ? 'danger' : 'warning'}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${m.expired ? 'blink-badge-danger' : 'blink-badge-warning'}`}>
                       {new Date(m.expiryDate).toLocaleDateString()}
-                    </Badge>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -255,11 +270,15 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {activeItems.map((h, i) => (
-                  <tr key={h.id} className="border-b border-line/50">
+                  <tr key={h.id} className="border-b border-line/50 bg-red-50/30">
                     <td className="px-3 py-2">{i + 1}</td>
                     <td className="px-3 py-2 font-medium">{h.name}</td>
-                    <td className="px-3 py-2 text-right">{h.currentStock}</td>
-                    <td className="px-3 py-2 text-right">{h.minimumStockAlert}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="blink-badge-danger px-2 py-0.5 rounded text-xs">
+                        {h.currentStock}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-muted">{h.minimumStockAlert}</td>
                     <td className="px-3 py-2">{h.unitOfMeasure}</td>
                   </tr>
                 ))}
@@ -279,11 +298,15 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {activeItems.map((m, i) => (
-                  <tr key={m.id} className="border-b border-line/50">
+                  <tr key={m.id} className="border-b border-line/50 bg-red-50/30">
                     <td className="px-3 py-2">{i + 1}</td>
                     <td className="px-3 py-2 font-medium">{m.name}</td>
-                    <td className="px-3 py-2 text-right">{m.currentStock}</td>
-                    <td className="px-3 py-2 text-right">{m.minimumStockAlert}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="blink-badge-danger px-2 py-0.5 rounded text-xs">
+                        {m.currentStock}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-muted">{m.minimumStockAlert}</td>
                   </tr>
                 ))}
               </tbody>
@@ -303,15 +326,15 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {activeItems.map((m, i) => (
-                  <tr key={m.id} className="border-b border-line/50">
+                  <tr key={m.id} className="border-b border-line/50 bg-amber-50/30">
                     <td className="px-3 py-2">{i + 1}</td>
                     <td className="px-3 py-2 font-medium">{m.name}</td>
-                    <td className="px-3 py-2 text-right">{m.currentStock}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{m.currentStock}</td>
                     <td className="px-3 py-2">{m.expiryDate ? new Date(m.expiryDate).toLocaleDateString() : '—'}</td>
                     <td className="px-3 py-2">
-                      <Badge variant={m.expired ? 'danger' : 'warning'}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${m.expired ? 'blink-badge-danger' : 'blink-badge-warning'}`}>
                         {m.expired ? 'Expired' : 'Expiring soon'}
-                      </Badge>
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -336,17 +359,18 @@ function StatCard({ icon: Icon, label, value, color, onClick }) {
     >
       <Card className={`transition-all duration-200 cursor-pointer h-full ${
         isAlert
-          ? 'bg-red-50/80 border-red-300 hover:border-red-400 shadow-sm shadow-red-100'
+          ? 'bg-red-50/80 border-red-400 hover:border-red-500 shadow-sm shadow-red-200 blink-tile-danger'
           : 'hover:border-forest-700/40'
       }`}>
         <CardBody className="flex items-center gap-4">
-          <div className={`p-3 rounded-lg ${isAlert ? 'bg-red-100 text-red-600' : `bg-forest-100 ${color}`}`}>
+          <div className={`p-3 rounded-lg relative ${isAlert ? 'bg-red-100 text-red-600' : `bg-forest-100 ${color}`}`}>
+            {isAlert && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />}
             <Icon className="w-5 h-5" />
           </div>
           <div>
-            <p className={`text-2xl font-bold ${isAlert ? 'text-red-600' : 'text-ink'}`}>{value}</p>
-            <p className={`text-sm ${isAlert ? 'text-red-900 font-semibold' : 'text-muted'}`}>{label}</p>
-            <p className={`text-xs mt-1 ${isAlert ? 'text-red-600 font-medium' : 'text-forest-700'}`}>Click to view list</p>
+            <p className={`text-2xl font-bold ${isAlert ? 'text-red-700' : 'text-ink'}`}>{value}</p>
+            <p className={`text-sm ${isAlert ? 'text-red-900 font-bold' : 'text-muted'}`}>{label}</p>
+            <p className={`text-xs mt-1 ${isAlert ? 'text-red-700 font-semibold' : 'text-forest-700'}`}>Click to view list</p>
           </div>
         </CardBody>
       </Card>

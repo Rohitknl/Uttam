@@ -1,9 +1,75 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Printer } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Table, Badge, SearchBar, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { parseHerbCode } from '../../utils/codeParser';
+import { printHtml } from '../../utils/print';
+
+function extractCodeSortKey(code) {
+  const str = String(code || '').trim().toUpperCase();
+  const match = str.match(/^(.*?)(\d+)$/);
+  if (match) {
+    return { prefix: match[1], num: parseInt(match[2], 10) };
+  }
+  return { prefix: str, num: null };
+}
+
+function isCodeInRange(code, fromCode, toCode) {
+  const c = String(code || '').trim().toUpperCase();
+  const from = String(fromCode || '').trim().toUpperCase();
+  const to = String(toCode || '').trim().toUpperCase();
+
+  if (!from && !to) return true;
+
+  const cKey = extractCodeSortKey(c);
+  const fromKey = from ? extractCodeSortKey(from) : null;
+  const toKey = to ? extractCodeSortKey(to) : null;
+
+  // Prefix-aware numeric match (e.g. TV01 to TV20)
+  if (cKey.num != null) {
+    if (fromKey && toKey && fromKey.prefix === toKey.prefix && cKey.prefix === fromKey.prefix) {
+      if (fromKey.num != null && toKey.num != null) {
+        return cKey.num >= fromKey.num && cKey.num <= toKey.num;
+      }
+    }
+    if (fromKey && !toKey && fromKey.prefix === cKey.prefix && fromKey.num != null) {
+      return cKey.num >= fromKey.num;
+    }
+    if (!fromKey && toKey && toKey.prefix === cKey.prefix && toKey.num != null) {
+      return cKey.num <= toKey.num;
+    }
+  }
+
+  // Pure numeric codes
+  const cNum = Number(c);
+  const fromNum = from ? Number(from) : NaN;
+  const toNum = to ? Number(to) : NaN;
+  if (!isNaN(cNum)) {
+    if (!isNaN(fromNum) && !isNaN(toNum)) {
+      return cNum >= fromNum && cNum <= toNum;
+    }
+    if (!isNaN(fromNum) && isNaN(toNum)) {
+      return cNum >= fromNum;
+    }
+    if (isNaN(fromNum) && !isNaN(toNum)) {
+      return cNum <= toNum;
+    }
+  }
+
+  // Natural string comparison fallback
+  const compareNatural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  if (from && to) {
+    return compareNatural(c, from) >= 0 && compareNatural(c, to) <= 0;
+  }
+  if (from) {
+    return compareNatural(c, from) >= 0;
+  }
+  if (to) {
+    return compareNatural(c, to) <= 0;
+  }
+  return true;
+}
 
 function getCodeSeries(code) {
   const raw = String(code || '').trim().toUpperCase();
@@ -76,6 +142,13 @@ export default function CodesPage({
   const [crudPassword, setCrudPassword] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [error, setError] = useState('');
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printMode, setPrintMode] = useState('all'); // 'all', 'codeRange', 'rowRange', 'series'
+  const [fromCode, setFromCode] = useState('');
+  const [toCode, setToCode] = useState('');
+  const [fromRow, setFromRow] = useState('');
+  const [toRow, setToRow] = useState('');
+  const [printSeries, setPrintSeries] = useState('');
 
   const emptyForm = (seedCode = '') => ({
     code: seedCode,
@@ -232,6 +305,134 @@ export default function CodesPage({
     }
   };
 
+  const allSortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      return String(a.code).localeCompare(String(b.code), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [items]);
+
+  const printableItems = useMemo(() => {
+    let result = allSortedItems;
+
+    if (printMode === 'series') {
+      if (printSeries) {
+        result = result.filter(item => {
+          const { prefix } = getCodeSeries(item.code);
+          return prefix === printSeries;
+        });
+      }
+    } else if (printMode === 'codeRange') {
+      result = result.filter(item => isCodeInRange(item.code, fromCode, toCode));
+    } else if (printMode === 'rowRange') {
+      const start = parseInt(fromRow, 10);
+      const end = parseInt(toRow, 10);
+      const min = Number.isFinite(start) && start > 0 ? start - 1 : 0;
+      const max = Number.isFinite(end) && end > 0 ? end : result.length;
+      result = result.slice(min, max);
+    }
+
+    return result;
+  }, [allSortedItems, printMode, printSeries, fromCode, toCode, fromRow, toRow]);
+
+  const openPrintModal = () => {
+    setPrintMode('all');
+    setFromCode('');
+    setToCode('');
+    setFromRow('');
+    setToRow('');
+    setPrintSeries(seriesOptions[0] || '');
+    setPrintModalOpen(true);
+  };
+
+  const handlePrint = () => {
+    if (!printableItems.length) return;
+
+    const esc = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    let rangeLabel = 'All Codes';
+    if (printMode === 'codeRange') {
+      rangeLabel = `Code Range: ${fromCode || (allSortedItems[0]?.code ?? 'Start')} to ${toCode || (allSortedItems[allSortedItems.length - 1]?.code ?? 'End')}`;
+    } else if (printMode === 'rowRange') {
+      rangeLabel = `Row Range: #${fromRow || '1'} to #${toRow || allSortedItems.length}`;
+    } else if (printMode === 'series') {
+      rangeLabel = `Series: ${printSeries ? `${printSeries} Series` : 'All'}`;
+    } else if (search) {
+      rangeLabel = `Search Filter: "${search}"`;
+    }
+
+    const rows = printableItems.map((item, idx) => `
+      <tr>
+        <td class="c">${idx + 1}</td>
+        <td style="font-weight: 600;">${esc(item.code)}</td>
+        <td>${esc(item.name)}</td>
+        ${!hideDescription ? `<td>${esc(item.description || '—')}</td>` : ''}
+        ${!hideStatus ? `<td>${item.assigned ? `Assigned${item.linkedItemName ? `: ${esc(item.linkedItemName)}` : ''}` : 'Available'}</td>` : ''}
+        ${!hideActive ? `<td class="c">${item.active !== false ? 'Yes' : 'No'}</td>` : ''}
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(title)} — Uttam Laboratories</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
+    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
+    .sub { color: #5c6b60; margin-bottom: 12px; }
+    h1 { font-size: 16px; margin: 0 0 8px; letter-spacing: 0.04em; color: #1c241e; }
+    .meta { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-bottom: 16px; font-size: 12px; color: #5c6b60; border-bottom: 1px solid #d5e0d8; padding-bottom: 10px; }
+    .meta strong { color: #1c241e; margin-left: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #d5e0d8; padding: 7px 10px; text-align: left; }
+    th { background: #e8f2eb; color: #2d5a3d; font-weight: 600; }
+    tr:nth-child(even) { background: #fbfdfc; }
+    .c { text-align: center; }
+    .r { text-align: right; }
+    .foot { margin-top: 24px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; display: flex; justify-content: space-between; }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 10mm; size: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="brand">Uttam Laboratories</div>
+  <div class="sub">Ayurvedic Stock &amp; Inventory</div>
+  <h1>${esc(title).toUpperCase()} DIRECTORY</h1>
+  <div class="meta">
+    <div>Filter:<strong>${esc(rangeLabel)}</strong></div>
+    <div>Total Records:<strong>${printableItems.length}</strong></div>
+    <div>Printed Date:<strong>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="c" style="width: 45px;">#</th>
+        <th style="width: 130px;">${esc(codeLabel)}</th>
+        <th>Name</th>
+        ${!hideDescription ? '<th>Description</th>' : ''}
+        ${!hideStatus ? '<th style="width: 140px;">Status</th>' : ''}
+        ${!hideActive ? '<th class="c" style="width: 60px;">Active</th>' : ''}
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="foot">
+    <span>Computer-generated directory — Uttam Laboratories</span>
+    <span>Total: ${printableItems.length} record(s)</span>
+  </div>
+</body>
+</html>`;
+
+    printHtml(html);
+    setPrintModalOpen(false);
+  };
+
   const columns = [
     { key: 'code', label: codeLabel },
     { key: 'name', label: 'Name' },
@@ -253,20 +454,29 @@ export default function CodesPage({
           <PageHeader
             title={title}
             subtitle={subtitle}
-            action={canWrite && (
-              <Button onClick={() => openCreate()}>
-                <Plus className="w-4 h-4" /> {addButtonLabel || 'Add Code'}
-              </Button>
-            )}
+            action={
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={openPrintModal}>
+                  <Printer className="w-4 h-4" /> Print
+                </Button>
+                {canWrite && (
+                  <Button onClick={() => openCreate()}>
+                    <Plus className="w-4 h-4" /> {addButtonLabel || 'Add Code'}
+                  </Button>
+                )}
+              </div>
+            }
           />
         </div>
         <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <CardBody className="flex-1 min-h-0 flex flex-col overflow-hidden !py-4">
-            <div className="mb-4 max-w-sm shrink-0">
-              <SearchBar value={search} onChange={setSearch} placeholder={`Search ${title.toLowerCase()}...`} />
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="max-w-sm flex-1 min-w-[200px]">
+                <SearchBar value={search} onChange={setSearch} placeholder={`Search ${title.toLowerCase()}...`} />
+              </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain panel-scroll border border-line rounded-lg">
-              {loading ? <LoadingSpinner /> : <Table columns={columns} data={items} showNumber={showNumber} />}
+              {loading ? <LoadingSpinner /> : <Table columns={columns} data={allSortedItems} showNumber={showNumber} />}
             </div>
           </CardBody>
         </Card>
@@ -382,6 +592,157 @@ export default function CodesPage({
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
           <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
+        </div>
+      </Modal>
+
+      {/* PRINT MODAL WITH RANGE FILTER */}
+      <Modal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        title={`Print ${title}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1.5">Print Selection</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => setPrintMode('all')}
+                className={`px-3 py-2 text-xs font-medium rounded-lg border text-center transition-colors cursor-pointer ${
+                  printMode === 'all'
+                    ? 'bg-forest-700 text-white border-forest-700'
+                    : 'bg-surface/50 text-ink border-line hover:bg-surface'
+                }`}
+              >
+                All Codes
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintMode('codeRange')}
+                className={`px-3 py-2 text-xs font-medium rounded-lg border text-center transition-colors cursor-pointer ${
+                  printMode === 'codeRange'
+                    ? 'bg-forest-700 text-white border-forest-700'
+                    : 'bg-surface/50 text-ink border-line hover:bg-surface'
+                }`}
+              >
+                Code Range
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintMode('rowRange')}
+                className={`px-3 py-2 text-xs font-medium rounded-lg border text-center transition-colors cursor-pointer ${
+                  printMode === 'rowRange'
+                    ? 'bg-forest-700 text-white border-forest-700'
+                    : 'bg-surface/50 text-ink border-line hover:bg-surface'
+                }`}
+              >
+                Row Range (#)
+              </button>
+              {seriesOptions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrintMode('series');
+                    if (!printSeries && seriesOptions[0]) setPrintSeries(seriesOptions[0]);
+                  }}
+                  className={`px-3 py-2 text-xs font-medium rounded-lg border text-center transition-colors cursor-pointer ${
+                    printMode === 'series'
+                      ? 'bg-forest-700 text-white border-forest-700'
+                      : 'bg-surface/50 text-ink border-line hover:bg-surface'
+                  }`}
+                >
+                  By Series
+                </button>
+              )}
+            </div>
+          </div>
+
+          {printMode === 'codeRange' && (
+            <div className="p-3 bg-surface/40 border border-line rounded-lg space-y-3">
+              <p className="text-xs text-muted">
+                Specify the starting and ending code (e.g. from <strong>{allSortedItems[0]?.code || 'A01'}</strong> to <strong>{allSortedItems[allSortedItems.length - 1]?.code || 'A50'}</strong>).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="From Code"
+                  value={fromCode}
+                  onChange={(e) => setFromCode(uppercaseCode ? e.target.value.toUpperCase() : e.target.value)}
+                  placeholder={allSortedItems[0]?.code || 'Start'}
+                />
+                <Input
+                  label="To Code"
+                  value={toCode}
+                  onChange={(e) => setToCode(uppercaseCode ? e.target.value.toUpperCase() : e.target.value)}
+                  placeholder={allSortedItems[allSortedItems.length - 1]?.code || 'End'}
+                />
+              </div>
+            </div>
+          )}
+
+          {printMode === 'rowRange' && (
+            <div className="p-3 bg-surface/40 border border-line rounded-lg space-y-3">
+              <p className="text-xs text-muted">
+                Specify row numbers to print (Total rows available: <strong>{allSortedItems.length}</strong>).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="From Row (#)"
+                  type="number"
+                  min="1"
+                  max={allSortedItems.length}
+                  value={fromRow}
+                  onChange={(e) => setFromRow(e.target.value)}
+                  placeholder="1"
+                />
+                <Input
+                  label="To Row (#)"
+                  type="number"
+                  min="1"
+                  max={allSortedItems.length}
+                  value={toRow}
+                  onChange={(e) => setToRow(e.target.value)}
+                  placeholder={String(allSortedItems.length)}
+                />
+              </div>
+            </div>
+          )}
+
+          {printMode === 'series' && seriesOptions.length > 0 && (
+            <div className="p-3 bg-surface/40 border border-line rounded-lg space-y-3">
+              <p className="text-xs text-muted">Filter and print only codes belonging to a specific series prefix.</p>
+              <Select
+                label="Select Series"
+                value={printSeries}
+                onChange={(e) => setPrintSeries(e.target.value)}
+              >
+                <option value="">All Series</option>
+                {seriesOptions.map((s) => (
+                  <option key={s} value={s}>{s} Series</option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between p-3 bg-forest-50/50 border border-forest-200/60 rounded-lg text-xs">
+            <div>
+              <span className="text-muted">Selected for printing: </span>
+              <strong className="text-forest-900 font-semibold">{printableItems.length} record(s)</strong>
+            </div>
+            {printableItems.length > 0 && (
+              <span className="text-forest-700 font-mono">
+                {printableItems[0]?.code} {printableItems.length > 1 ? `... ${printableItems[printableItems.length - 1]?.code}` : ''}
+              </span>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setPrintModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePrint} disabled={printableItems.length === 0}>
+              <Printer className="w-4 h-4" /> Print Sheet
+            </Button>
+          </div>
         </div>
       </Modal>
     </Layout>

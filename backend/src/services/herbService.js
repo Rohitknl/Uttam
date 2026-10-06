@@ -73,10 +73,22 @@ export async function getAllHerbs(search) {
   const herbs = await prisma.herb.findMany({
     where,
     include: { herbCode: true },
-    orderBy: { name: 'asc' },
   });
   const rateMap = await getLatestRatesForHerbs(herbs.map(h => h.id));
-  return herbs.map(herb => formatHerb(herb, rateMap.get(herb.id)?.rate));
+  const list = herbs.map(herb => formatHerb(herb, rateMap.get(herb.id)?.rate));
+
+  list.sort((a, b) => {
+    const codeA = a.herbCode || '';
+    const codeB = b.herbCode || '';
+    if (!codeA && !codeB) return (a.name || '').localeCompare(b.name || '');
+    if (!codeA) return 1;
+    if (!codeB) return -1;
+    const cmp = String(codeA).localeCompare(String(codeB), undefined, { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0) return cmp;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  return list;
 }
 
 export async function getHerbById(id) {

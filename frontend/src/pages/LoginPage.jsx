@@ -34,8 +34,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-forest-950 mb-4">
-            <Package className="w-8 h-8 text-saffron-500" />
+          <div className="inline-flex items-center justify-center w-28 h-28 rounded-full overflow-hidden shadow-lg ring-2 ring-forest-700/30 mb-4 bg-forest-950">
+            <img src="/logo.jpg" alt="Uttam Laboratories" className="w-full h-full object-cover" />
           </div>
           <h1 className="font-display text-3xl font-bold text-ink">Uttam Laboratories</h1>
           <p className="text-muted mt-2">Ayurvedic Stock & Inventory Management</p>

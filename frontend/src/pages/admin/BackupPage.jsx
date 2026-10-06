@@ -410,13 +410,9 @@ export default function BackupPage() {
       </div>
 
       {/* RESET TO EMPTY DATA CARD */}
-      <div className="mt-6">
+      {/* <div className="mt-6">
         <Card className="border-red-200 bg-red-50/20">
           <CardBody className="space-y-4">
-            <div className="flex items-center gap-2 text-red-700 font-semibold text-lg">
-              <RotateCcw className="w-5 h-5" />
-              Reset Database to Empty State
-            </div>
             <p className="text-sm text-gray-600">
               Clear all raw herbs, medicines, supplier bills, formulas, and orders. A safety backup will be saved automatically before clearing.
             </p>
@@ -442,7 +438,7 @@ export default function BackupPage() {
             </div>
           </CardBody>
         </Card>
-      </div>
+      </div> */}
 
       {/* Confirmation Modal for Restore */}
       <Modal

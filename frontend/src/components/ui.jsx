@@ -563,7 +563,7 @@ export function Alert({ type = 'info', children, onClose }) {
   );
 }
 
-export function Table({ columns, data, onRowClick, showNumber = false, maxHeight, fit = false }) {
+export function Table({ columns, data, onRowClick, showNumber = false, maxHeight, fit = false, getRowClassName }) {
   return (
     <div
       className={
@@ -596,8 +596,14 @@ export function Table({ columns, data, onRowClick, showNumber = false, maxHeight
             <tr>
               <td colSpan={columns.length + (showNumber ? 1 : 0)} className="px-4 py-8 text-center text-muted">No records found</td>
             </tr>
-          ) : data.map((row, i) => (
-            <tr key={row.id ?? i} onClick={() => onRowClick?.(row)} className={`border-b border-line/50 hover:bg-surface/30 ${onRowClick ? 'cursor-pointer' : ''}`}>
+          ) : data.map((row, i) => {
+            const customRowClass = getRowClassName ? getRowClassName(row, i) : '';
+            return (
+              <tr
+                key={row.id ?? i}
+                onClick={() => onRowClick?.(row)}
+                className={`border-b border-line/50 hover:bg-surface/30 ${onRowClick ? 'cursor-pointer' : ''} ${customRowClass}`}
+              >
               {showNumber && (
                 <td className={`px-4 py-3 whitespace-nowrap font-medium text-ink ${fit ? 'px-2 py-2 text-xs' : ''}`}>{i + 1}</td>
               )}
@@ -611,7 +617,8 @@ export function Table({ columns, data, onRowClick, showNumber = false, maxHeight
                 </td>
               ))}
             </tr>
-          ))}
+          );
+        })}
         </tbody>
       </table>
     </div>

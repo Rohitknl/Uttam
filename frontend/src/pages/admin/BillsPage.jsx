@@ -5,6 +5,7 @@ import Layout from '../../components/Layout';
 import { Card, CardBody, Button, Modal, Input, Select, DropdownSelect, Combobox, Table, SearchBar, PageHeader, LoadingSpinner, Alert, Textarea } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { billsApi, herbCodesApi, inventoryApi } from '../../api';
+import { printHtml } from '../../utils/print';
 
 const UNITS = ['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES'];
 
@@ -693,15 +694,10 @@ export default function BillsPage() {
 </head>
 <body>
   ${bodyContent}
-  <script>window.onload = () => window.print();</script>
 </body>
 </html>`;
 
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.focus();
+    printHtml(html);
   };
 
   const columns = [

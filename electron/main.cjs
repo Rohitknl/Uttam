@@ -316,6 +316,7 @@ function createWindow() {
     minHeight: 680,
     show: false,
     title: 'Uttam Laboratory',
+    icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -331,8 +332,19 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      const localOrigin = `http://${HOST}:${DESKTOP_PORT}`;
+      if (!url.startsWith(localOrigin)) {
+        shell.openExternal(url);
+        return { action: 'deny' };
+      }
+    }
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        autoHideMenuBar: true,
+      },
+    };
   });
 
   mainWindow.loadURL(`http://${HOST}:${DESKTOP_PORT}`);

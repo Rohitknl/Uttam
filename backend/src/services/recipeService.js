@@ -74,7 +74,7 @@ export async function updateRecipeByMedicineCodeId(medicineCodeId, data) {
     seenHerbIds.add(herbId);
 
     const herb = await prisma.herb.findUnique({ where: { id: herbId } });
-    if (!herb) throw new AppError(`Herb ${herbId} not found`, 400);
+    if (!herb) throw new AppError('Herb does not exist in Store.', 400);
     const herbUnit = herb.unitOfMeasure || 'KG';
     const recipeUnit = item.unit || herbUnit;
     if (UNIT_FAMILY[recipeUnit] !== UNIT_FAMILY[herbUnit]) {
