@@ -1153,7 +1153,7 @@ export default function FormulaPage() {
       key: 'srNo',
       label: '#',
       render: (_, idx) => (
-        <span className="text-muted font-mono text-xs font-semibold">
+        <span className="text-forest-800 font-mono text-sm font-bold">
           {Number.isFinite(idx) ? idx + 1 : 1}
         </span>
       ),
@@ -1162,7 +1162,7 @@ export default function FormulaPage() {
       key: 'code',
       label: 'Medicine Code',
       render: (m) => (
-        <span className="font-mono font-bold text-forest-800 hover:text-forest-950 hover:underline cursor-pointer">
+        <span className="inline-flex px-3 py-1 rounded-lg bg-forest-100 text-forest-950 border-2 border-forest-600 font-mono font-black text-sm tracking-wide shadow-2xs hover:bg-forest-200 cursor-pointer">
           {m.code}
         </span>
       ),
@@ -1171,21 +1171,25 @@ export default function FormulaPage() {
       key: 'name',
       label: 'Medicine Name',
       render: m => (
-        <span className="font-medium text-ink hover:text-forest-800 cursor-pointer">{m.name}</span>
+        <span className="font-bold text-base text-ink hover:text-forest-700 cursor-pointer">{m.name}</span>
       ),
     },
     {
       key: 'baseFormula',
       label: 'Base Formula',
-      render: m => `${m.formulaQuantity ?? 1} ${m.formulaUnit || 'PIECES'}`,
+      render: m => (
+        <span className="font-semibold text-[15px] text-slate-800">
+          {m.formulaQuantity ?? 1} <strong className="text-forest-700 font-bold">{m.formulaUnit || 'PIECES'}</strong>
+        </span>
+      ),
     },
     {
       key: 'status',
       label: 'Status',
       render: m => (m.hasRecipe ? (
-        <Badge variant="success">Defined ({m.recipeItemsCount} herbs)</Badge>
+        <Badge variant="success">Configured ({m.recipeItemsCount} herbs)</Badge>
       ) : (
-        <Badge variant="neutral">Not Configured</Badge>
+        <Badge variant="warning">Not Configured</Badge>
       )),
     },
     {
@@ -1196,19 +1200,19 @@ export default function FormulaPage() {
           {canWrite && (
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               onClick={(e) => {
                 e?.stopPropagation?.();
                 selectMedicineCode(m.medicineCodeId);
                 setActiveTab('edit');
               }}
             >
-              <Edit3 className="w-3.5 h-3.5" /> {m.hasRecipe ? 'Edit' : 'Add'}
+              <Edit3 className="w-3.5 h-3.5" /> {m.hasRecipe ? 'Edit Formula' : 'Add Formula'}
             </Button>
           )}
           <Button
             size="sm"
-            variant="secondary"
+            variant="primary"
             onClick={(e) => {
               e?.stopPropagation?.();
               selectMedicineCode(m.medicineCodeId);
@@ -1481,53 +1485,54 @@ export default function FormulaPage() {
 
             {selectedMedicineCodeId ? (
               <div className="space-y-4 pt-2">
-                <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-surface/50 border border-line">
+                <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-xl bg-forest-50/70 border-2 border-forest-600/50 shadow-xs">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-bold text-ink">{selectedMedicine?.code} — {selectedMedicine?.name}</h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-black text-forest-950 tracking-tight">{selectedMedicine?.code} — {selectedMedicine?.name}</h2>
                       {hasRecipe ? (
                         <Badge variant="success">Formula Configured</Badge>
                       ) : (
-                        <Badge variant="neutral">No Formula</Badge>
+                        <Badge variant="warning">No Formula</Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted mt-1">
-                      Base formula: <strong className="text-ink">{formulaQuantity} {formulaUnit}</strong>
+                    <p className="text-base text-muted font-medium mt-1">
+                      Base formula: <strong className="text-forest-900 font-bold underline decoration-2">{formulaQuantity} {formulaUnit}</strong>
                       {hasRecipe && ` · ${recipe.length} herb${recipe.length === 1 ? '' : 's'} defined`}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {canWrite && (
                       <Button
-                        size="sm"
+                        size="md"
+                        variant="primary"
                         onClick={() => setActiveTab('edit')}
-                        className="flex items-center gap-1.5"
+                        className="flex items-center gap-1.5 shadow-xs"
                       >
-                        <Edit3 className="w-3.5 h-3.5" /> {hasRecipe ? 'Edit Formula' : 'Add Formula'}
+                        <Edit3 className="w-4 h-4" /> {hasRecipe ? 'Edit Formula' : 'Add Formula'}
                       </Button>
                     )}
                     {canWrite && (
                       <Button
-                        size="sm"
+                        size="md"
                         variant="secondary"
                         onClick={() => {
                           setActiveTab('edit');
                           addItem();
                         }}
-                        className="flex items-center gap-1.5"
+                        className="flex items-center gap-1.5 shadow-xs"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Add Herb
+                        <Plus className="w-4 h-4" /> Add Herb
                       </Button>
                     )}
                   </div>
                 </div>
 
                 {description && (
-                  <div className="p-3.5 rounded-lg bg-white border border-line shadow-2xs">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted block mb-1">
+                  <div className="p-4 rounded-xl bg-amber-50/60 border-2 border-amber-300/80 shadow-2xs">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900 block mb-1">
                       Formula Description &amp; Notes
                     </span>
-                    <p className="text-sm text-ink whitespace-pre-wrap">{description}</p>
+                    <p className="text-base font-medium text-ink whitespace-pre-wrap">{description}</p>
                   </div>
                 )}
 
@@ -1538,15 +1543,15 @@ export default function FormulaPage() {
                     {canWrite && (
                       <div className="flex justify-end pt-1">
                         <Button
-                          size="sm"
+                          size="md"
                           variant="secondary"
                           onClick={() => {
                             setActiveTab('edit');
                             addItem();
                           }}
-                          className="flex items-center gap-1.5"
+                          className="flex items-center gap-1.5 shadow-xs"
                         >
-                          <Plus className="w-3.5 h-3.5" /> Add Herb to Formula
+                          <Plus className="w-4 h-4" /> Add Herb to Formula
                         </Button>
                       </div>
                     )}
@@ -1558,17 +1563,17 @@ export default function FormulaPage() {
                       const matched = medQty > 0 && Math.abs(herbTotal - medQty) <= 1e-9;
                       const tooLow = medQty > 0 && herbTotal + 1e-9 < medQty;
                       return (
-                        <div className={`text-sm rounded-lg border px-3.5 py-2.5 ${
-                          matched ? 'border-forest-700/40 bg-forest-700/5 text-ink'
-                            : tooLow ? 'border-red-300 bg-red-50 text-red-800'
-                              : 'border-line bg-surface/40 text-muted'
+                        <div className={`text-base font-bold rounded-xl border-2 px-5 py-3 shadow-xs transition-all ${
+                          matched ? 'border-emerald-600 bg-emerald-50 text-emerald-950'
+                            : tooLow ? 'border-rose-500 bg-rose-50 text-rose-950'
+                              : 'border-amber-500 bg-amber-50 text-amber-950'
                         }`}>
-                          Base Medicine Quantity: <strong>{formatQtyLabel(medQty, formulaUnit)}</strong>
+                          <span className="text-forest-900">Base Medicine Quantity: <strong className="underline decoration-2">{formatQtyLabel(medQty, formulaUnit)}</strong></span>
                           {' · '}
-                          Total Herbs: <strong>{formatQtyLabel(herbTotal, formulaUnit)}</strong>
-                          {matched && ' — balanced (100%)'}
-                          {tooLow && ' — herb sum is less than base medicine quantity'}
-                          {!matched && !tooLow && medQty > 0 && herbTotal > 0 && ' — herb sum exceeds base medicine quantity'}
+                          <span className="text-forest-900">Total Herbs: <strong className="underline decoration-2">{formatQtyLabel(herbTotal, formulaUnit)}</strong></span>
+                          {matched && <span className="ml-2 text-emerald-800 font-black">✓ balanced (100%)</span>}
+                          {tooLow && <span className="ml-2 text-rose-700 font-black">⚠ herb sum is less than base medicine quantity</span>}
+                          {!matched && !tooLow && medQty > 0 && herbTotal > 0 && <span className="ml-2 text-amber-800 font-black">⚠ herb sum exceeds base medicine quantity</span>}
                         </div>
                       );
                     })()}
@@ -1669,14 +1674,17 @@ export default function FormulaPage() {
               <>
                 {message && <Alert type={message.includes('success') ? 'success' : 'error'}>{message}</Alert>}
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {recipe.map((item, idx) => {
                     const herb = herbs.find(h => h.id === parseInt(item.herbId, 10));
                     const opt = herbOptions.find(o => String(o.herbCodeId) === String(item.herbCodeId));
                     const unitSource = herb || (opt ? { unitOfMeasure: opt.unit } : null);
                     const unitOptions = unitSource ? unitsForHerb(unitSource) : [];
                     return (
-                      <div key={item._key || `recipe-item-${idx}`} className="flex gap-2 items-end">
+                      <div key={item._key || `recipe-item-${idx}`} className="flex gap-3 items-end p-3.5 rounded-xl bg-surface/80 border-2 border-line hover:border-forest-600/50 transition-all shadow-2xs">
+                        <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-forest-700 text-white font-black text-xs shadow-xs mb-2">
+                          {idx + 1}
+                        </div>
                         <DropdownSelect
                           label={idx === 0 ? 'Herb' : ''}
                           searchable
@@ -1702,19 +1710,19 @@ export default function FormulaPage() {
                           placeholder="Qty"
                           value={item.quantity}
                           onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                          className="w-32"
+                          className="w-36"
                         />
                         <Select
                           label={idx === 0 ? 'Herb Unit' : ''}
                           value={item.unit}
                           onChange={e => updateItem(idx, 'unit', e.target.value)}
-                          className="w-36"
+                          className="w-40"
                           disabled={!unitSource}
                         >
                           {!unitSource && <option value="">Select herb first</option>}
                           {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
                         </Select>
-                        {canWrite && <Button variant="danger" size="sm" onClick={() => removeItem(idx)}>Remove</Button>}
+                        {canWrite && <Button variant="danger" size="md" onClick={() => removeItem(idx)}>Remove</Button>}
                       </div>
                     );
                   })}
@@ -1729,18 +1737,18 @@ export default function FormulaPage() {
                   const matched = medQty > 0 && Math.abs(herbTotal - medQty) <= 1e-9;
                   const tooLow = medQty > 0 && herbTotal + 1e-9 < medQty;
                   return (
-                    <div className={`text-sm rounded-lg border px-3 py-2 ${
-                      matched ? 'border-forest-700/40 bg-forest-700/5 text-ink'
-                        : tooLow ? 'border-red-300 bg-red-50 text-red-800'
-                          : 'border-line bg-surface/40 text-muted'
+                    <div className={`text-base font-bold rounded-xl border-2 px-5 py-3.5 shadow-sm transition-all ${
+                      matched ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                        : tooLow ? 'border-rose-500 bg-rose-50 text-rose-950 ring-2 ring-rose-500/20'
+                          : 'border-amber-500 bg-amber-50 text-amber-950 ring-2 ring-amber-500/20'
                     }`}
                     >
-                      Medicine: <strong>{formatQtyLabel(medQty, formulaUnit)}</strong>
+                      <span className="text-forest-900">Medicine: <strong className="underline decoration-2">{formatQtyLabel(medQty, formulaUnit)}</strong></span>
                       {' · '}
-                      Herbs total: <strong>{formatQtyLabel(herbTotal, formulaUnit)}</strong>
-                      {matched && ' — totals match'}
-                      {tooLow && ' — herbs are less than medicine quantity'}
-                      {!matched && !tooLow && medQty > 0 && herbTotal > 0 && ' — herbs exceed medicine quantity'}
+                      <span className="text-forest-900">Herbs total: <strong className="underline decoration-2">{formatQtyLabel(herbTotal, formulaUnit)}</strong></span>
+                      {matched && <span className="ml-2 inline-flex items-center gap-1 text-emerald-800 font-black">✓ Totals match perfectly</span>}
+                      {tooLow && <span className="ml-2 inline-flex items-center gap-1 text-rose-700 font-black">⚠ Herbs are less than medicine quantity</span>}
+                      {!matched && !tooLow && medQty > 0 && herbTotal > 0 && <span className="ml-2 inline-flex items-center gap-1 text-amber-800 font-black">⚠ Herbs exceed medicine quantity</span>}
                     </div>
                   );
                 })()}

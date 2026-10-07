@@ -3,15 +3,23 @@
 @theme {
   --font-display: "Fraunces", Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
-  --color-forest-950: #0f1f14;
-  --color-forest-700: #2d5a3d;
-  --color-forest-100: #e8f2eb;
-  --color-saffron-500: #c4782a;
-  --color-saffron-100: #faf0e4;
-  --color-ink: #1c241e;
-  --color-muted: #5c6b60;
-  --color-line: #d5e0d8;
-  --color-surface: #f7faf7;
+  --color-forest-950: #0a180f;
+  --color-forest-800: #1a4d2e;
+  --color-forest-700: #235d37;
+  --color-forest-600: #2c7746;
+  --color-forest-100: #e2ede5;
+  --color-forest-50: #f0f7f2;
+  --color-saffron-600: #b45309;
+  --color-saffron-500: #d97706;
+  --color-saffron-100: #fef3c7;
+  --color-ink: #0f172a;
+  --color-muted: #475569;
+  --color-line: #cbd5e1;
+  --color-surface: #f8fafc;
+}
+
+html {
+  font-size: 16.5px;
 }
 
 html, body, #root {
@@ -22,7 +30,8 @@ html, body, #root {
 body {
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background: radial-gradient(ellipse at top left, var(--color-forest-100) 0%, var(--color-surface) 50%, #fff 100%);
+  background: radial-gradient(ellipse at top left, #eaf4ed 0%, #f6faf7 45%, #ffffff 100%);
+  -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
@@ -57,14 +66,34 @@ body {
 
 /* Explicit text cursor and blinking caret for all form inputs */
 input, textarea {
-  caret-color: #2d5a3d !important;
+  caret-color: #235d37 !important;
   cursor: text !important;
   -webkit-user-select: text !important;
   user-select: text !important;
+  font-size: 0.975rem !important;
+  color: #0f172a !important;
 }
 
 select {
   cursor: pointer !important;
+  font-size: 0.975rem !important;
+  color: #0f172a !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Crisp high-contrast table styling */
+table th {
+  color: #143e26 !important;
+  background-color: #e6f0e9 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #235d37 !important;
+}
+
+table td {
+  color: #0f172a !important;
 }
 
 /* Permanent safety rule: Ensure root app and body never get stuck in non-clickable state */

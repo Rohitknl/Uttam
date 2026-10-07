@@ -62,24 +62,24 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="fixed left-0 top-0 bottom-0 w-64 bg-forest-950 text-white flex flex-col z-40">
-        <div className="px-5 py-4 border-b border-white/10">
+      <aside className="fixed left-0 top-0 bottom-0 w-64 bg-forest-950 text-white flex flex-col z-40 border-r-2 border-forest-800/60 shadow-xl">
+        <div className="px-5 py-4.5 border-b-2 border-white/10 bg-forest-950/80">
           <div className="flex items-center gap-3">
             <img
               src="/logo.jpg"
               alt="Uttam Laboratories"
-              className="w-11 h-11 rounded-full object-cover shadow-sm ring-1 ring-amber-400/40 shrink-0"
+              className="w-12 h-12 rounded-full object-cover shadow-md ring-2 ring-amber-400 shrink-0"
             />
             <div>
-              <h1 className="font-display text-base font-bold leading-tight">Uttam Laboratories</h1>
-              <p className="text-xs text-white/60">Ayurvedic Inventory</p>
+              <h1 className="font-display text-lg font-bold leading-tight text-white tracking-wide">Uttam Laboratories</h1>
+              <p className="text-xs text-amber-300 font-semibold tracking-wider">Ayurvedic Inventory</p>
             </div>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 panel-scroll">
           {nav.map((item, i) => {
             if (item.group) {
-              return <p key={i} className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wider text-white/40 font-medium">{item.group}</p>;
+              return <p key={i} className="px-3 pt-4 pb-1.5 text-xs uppercase tracking-wider text-amber-400 font-black">{item.group}</p>;
             }
             if (item.adminOnly && !isAdmin) return null;
             const Icon = item.icon;
@@ -94,19 +94,19 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
                 : (tabParam === 'define' ? 'edit' : (tabParam === 'generate' ? 'print' : 'view'));
 
               return (
-                <div key={item.to} className="mb-0.5">
+                <div key={item.to} className="mb-1">
                   <div
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[15px] font-semibold transition-all ${
                       isParentPath
-                        ? 'bg-forest-900/90 text-white font-medium border border-forest-700/40'
-                        : 'text-white/70 hover:bg-white/5 hover:text-white'
+                        ? 'bg-forest-800 text-white border-l-4 border-l-amber-400 shadow-sm'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <NavLink
                       to={item.to}
                       className="flex items-center gap-3 min-w-0 flex-1"
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
+                      <Icon className="w-5 h-5 shrink-0 text-amber-400" />
                       <span className="truncate">{item.label}</span>
                     </NavLink>
                     <button
@@ -116,19 +116,19 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
                         e.stopPropagation();
                         toggleMenu(item.to);
                       }}
-                      className="p-1 -mr-1 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+                      className="p-1 -mr-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
                       title={isExpanded ? 'Collapse sub classes' : 'Expand sub classes'}
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5" />
+                        <ChevronDown className="w-4 h-4" />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="w-4 h-4" />
                       )}
                     </button>
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-1 mb-1.5 ml-4 pl-3 border-l border-white/20 space-y-0.5">
+                    <div className="mt-1.5 mb-2 ml-4 pl-3.5 border-l-2 border-forest-700/60 space-y-1">
                       {item.subClasses.map((sub) => {
                         const isSubActive = isParentPath && currentTab === sub.tab;
                         const SubIcon = sub.icon;
@@ -136,13 +136,13 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
                           <NavLink
                             key={sub.to}
                             to={sub.to}
-                            className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
                               isSubActive
-                                ? 'bg-forest-700 text-white font-medium shadow-xs'
-                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                ? 'bg-forest-700 text-white border-l-3 border-l-amber-400 shadow-xs'
+                                : 'text-white/75 hover:bg-white/10 hover:text-white'
                             }`}
                           >
-                            {SubIcon && <SubIcon className="w-3.5 h-3.5 shrink-0 opacity-80" />}
+                            {SubIcon && <SubIcon className="w-4 h-4 shrink-0 text-amber-300" />}
                             <span className="truncate">{sub.label}</span>
                           </NavLink>
                         );
@@ -159,34 +159,34 @@ export default function Layout({ children, portal = 'admin', fillHeight = false 
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors mb-0.5 ${
-                    isActive ? 'bg-forest-700 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[15px] font-semibold transition-all mb-1 ${
+                    isActive ? 'bg-forest-800 text-white border-l-4 border-l-amber-400 shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon className="w-5 h-5 shrink-0 text-amber-400/90" />
                 {item.label}
               </NavLink>
             );
           })}
         </nav>
-        <div className="px-4 py-4 border-t border-white/10">
-          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:bg-white/5 hover:text-white w-full transition-colors">
-            <LogOut className="w-4 h-4" />
+        <div className="px-4 py-4 border-t-2 border-white/10 bg-forest-950/90">
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[15px] font-semibold text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 w-full transition-colors cursor-pointer">
+            <LogOut className="w-5 h-5 text-rose-400" />
             Sign Out
           </button>
         </div>
       </aside>
 
       <div className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
-        <header className="shrink-0 z-30 bg-white/80 backdrop-blur-md border-b border-line px-8 py-4">
+        <header className="shrink-0 z-30 bg-white/95 backdrop-blur-md border-b-2 border-line px-8 py-4 shadow-2xs">
           <div className="flex items-center justify-between">
             <div />
             <div className="flex items-center gap-3">
-              <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-forest-100 text-forest-700">
+              <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-forest-100 text-forest-900 border border-forest-600 shadow-2xs">
                 {roleLabel[user?.role] || 'User'}
               </span>
-              <span className="text-sm font-medium text-ink">{user?.fullName}</span>
+              <span className="text-base font-bold text-ink">{user?.fullName}</span>
             </div>
           </div>
         </header>

@@ -7,15 +7,15 @@ export function Card({ children, className = '' }) {
   const hasBorder = className.includes('border-');
   const baseBg = hasBg ? '' : 'bg-white';
   const baseBorder = hasBorder ? '' : 'border-line';
-  return <div className={`${baseBg} rounded-xl border ${baseBorder} shadow-sm ${className}`}>{children}</div>;
+  return <div className={`${baseBg} rounded-xl border-2 ${baseBorder} shadow-sm ${className}`}>{children}</div>;
 }
 
 export function CardHeader({ title, subtitle, action }) {
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+    <div className="flex items-center justify-between px-6 py-4 border-b-2 border-line bg-surface/60">
       <div>
-        <h2 className="font-display text-lg font-semibold text-ink">{title}</h2>
-        {subtitle && <p className="text-sm text-muted mt-0.5">{subtitle}</p>}
+        <h2 className="font-display text-xl font-bold text-forest-950">{title}</h2>
+        {subtitle && <p className="text-sm font-medium text-muted mt-0.5">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -28,17 +28,17 @@ export function CardBody({ children, className = '' }) {
 
 export function Button({ children, variant = 'primary', size = 'md', className = '', disabled, type = 'button', ...props }) {
   const variants = {
-    primary: 'bg-forest-700 text-white hover:bg-forest-950 disabled:opacity-50',
-    secondary: 'bg-forest-100 text-forest-700 hover:bg-line disabled:opacity-50',
-    danger: 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50',
-    ghost: 'text-muted hover:bg-forest-100 disabled:opacity-50',
-    saffron: 'bg-saffron-500 text-white hover:bg-saffron-500/90 disabled:opacity-50',
+    primary: 'bg-forest-700 text-white border-2 border-forest-950 hover:bg-forest-800 shadow-sm disabled:opacity-50',
+    secondary: 'bg-forest-50 text-forest-800 border-2 border-forest-600 hover:bg-forest-100 disabled:opacity-50',
+    danger: 'bg-red-600 text-white border-2 border-red-700 hover:bg-red-700 shadow-sm disabled:opacity-50',
+    ghost: 'text-forest-800 hover:bg-forest-100 disabled:opacity-50 font-semibold',
+    saffron: 'bg-saffron-500 text-white border-2 border-saffron-600 hover:bg-saffron-600 shadow-sm disabled:opacity-50',
   };
-  const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-2.5' };
+  const sizes = { sm: 'px-3.5 py-1.5 text-sm', md: 'px-4.5 py-2 text-[15px]', lg: 'px-6 py-2.5 text-base' };
   return (
     <button
       type={type}
-      className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all cursor-pointer ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled}
       {...props}
     >
@@ -54,11 +54,11 @@ export function Input({ label, error, className = '', type = 'text', showPasswor
 
   return (
     <div className={className}>
-      {label && <label className="block text-sm font-medium text-ink mb-1">{label}</label>}
+      {label && <label className="block text-[15px] font-bold text-forest-950 mb-1">{label}</label>}
       <div className="relative">
         <input
           type={effectiveType}
-          className={`w-full px-3 py-2 ${isPassword && showPasswordToggle ? 'pr-10' : ''} rounded-lg border border-line bg-white text-ink placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 ${error ? 'border-red-500' : ''}`}
+          className={`w-full px-3.5 py-2 text-base font-medium ${isPassword && showPasswordToggle ? 'pr-10' : ''} rounded-lg border-2 border-line bg-white text-ink placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 ${error ? 'border-red-500' : ''}`}
           {...props}
         />
         {isPassword && showPasswordToggle && (
@@ -75,7 +75,7 @@ export function Input({ label, error, className = '', type = 'text', showPasswor
           </button>
         )}
       </div>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-red-500 text-xs font-semibold mt-1">{error}</p>}
     </div>
   );
 }
@@ -83,14 +83,14 @@ export function Input({ label, error, className = '', type = 'text', showPasswor
 export function Select({ label, error, children, className = '', ...props }) {
   return (
     <div className={className}>
-      {label && <label className="block text-sm font-medium text-ink mb-1">{label}</label>}
+      {label && <label className="block text-[15px] font-bold text-forest-950 mb-1">{label}</label>}
       <select
-        className={`w-full px-3 py-2 rounded-lg border border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 ${error ? 'border-red-500' : ''}`}
+        className={`w-full px-3.5 py-2 text-base font-medium rounded-lg border-2 border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 ${error ? 'border-red-500' : ''}`}
         {...props}
       >
         {children}
       </select>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-red-500 text-xs font-semibold mt-1">{error}</p>}
     </div>
   );
 }
@@ -163,45 +163,45 @@ export function DropdownSelect({
 
   return (
     <div className={`relative ${className}`} ref={rootRef}>
-      {label && <label className="block text-sm font-medium text-ink mb-1">{label}</label>}
+      {label && <label className="block text-[15px] font-bold text-forest-950 mb-1">{label}</label>}
       <button
         ref={btnRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen(v => !v)}
-        className={`w-full px-3 py-2 rounded-lg border border-line bg-white text-left text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 disabled:opacity-60 flex items-center justify-between gap-2 ${error ? 'border-red-500' : ''}`}
+        className={`w-full px-3.5 py-2 rounded-lg border-2 border-line bg-white text-left text-ink text-base font-medium focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700 disabled:opacity-60 flex items-center justify-between gap-2 shadow-2xs ${error ? 'border-red-500' : ''}`}
       >
-        <span className={`truncate ${selected ? '' : 'text-muted'}`}>{display}</span>
-        <ChevronDown className={`w-4 h-4 text-muted shrink-0 transition-transform duration-200 ${open ? 'rotate-180 text-forest-700' : ''}`} />
+        <span className={`truncate ${selected ? 'font-semibold text-ink' : 'text-muted'}`}>{display}</span>
+        <ChevronDown className={`w-4 h-4 text-forest-700 shrink-0 transition-transform duration-200 ${open ? 'rotate-180 text-forest-900' : ''}`} />
       </button>
       {open && createPortal(
         <div
           ref={menuRef}
           style={menuStyle}
-          className="flex flex-col overflow-hidden overscroll-contain rounded-lg border border-line bg-white shadow-xl animate-in fade-in-50 duration-150"
+          className="flex flex-col overflow-hidden overscroll-contain rounded-xl border-2 border-forest-700/40 bg-white shadow-2xl animate-in fade-in-50 duration-150"
           onWheel={e => e.stopPropagation()}
         >
           {searchable && (
-            <div className="shrink-0 border-b border-line p-2">
+            <div className="shrink-0 border-b-2 border-line p-2.5 bg-surface/50">
               <input
                 ref={searchRef}
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full px-2 py-1.5 text-sm rounded border border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30"
+                className="w-full px-3 py-2 text-base font-medium rounded-lg border-2 border-line bg-white text-ink focus:outline-none focus:ring-2 focus:ring-forest-700/30 focus:border-forest-700"
               />
             </div>
           )}
-          <div className="overflow-y-auto flex-1 min-h-0 panel-scroll py-1">
+          <div className="overflow-y-auto flex-1 min-h-0 panel-scroll py-1.5">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-muted">No matching options</div>
+              <div className="px-4 py-3 text-base text-muted font-medium">No matching options</div>
             ) : (
               filtered.map(opt => (
                 <button
                   key={String(opt.value)}
                   type="button"
-                  className={`w-full px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-forest-50 ${String(opt.value) === String(value) ? 'bg-forest-100 text-forest-800 font-semibold' : 'text-ink'}`}
+                  className={`w-full px-4 py-2.5 text-left text-[15px] font-medium transition-colors hover:bg-forest-100 ${String(opt.value) === String(value) ? 'bg-forest-200/70 text-forest-950 font-bold' : 'text-ink'}`}
                   onClick={() => {
                     onChange(opt.value);
                     setOpen(false);
@@ -215,7 +215,7 @@ export function DropdownSelect({
         </div>,
         document.body,
       )}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-red-500 text-xs font-semibold mt-1">{error}</p>}
     </div>
   );
 }
@@ -437,15 +437,18 @@ export function Textarea({ label, error, className = '', rows = 3, ...props }) {
   );
 }
 
-export function Badge({ children, variant = 'default' }) {
+export function Badge({ children, variant = 'default', className = '' }) {
   const variants = {
-    default: 'bg-forest-100 text-forest-700',
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-saffron-100 text-saffron-500',
-    danger: 'bg-red-100 text-red-700',
-    info: 'bg-blue-100 text-blue-700',
+    default: 'bg-forest-100 text-forest-950 border border-forest-600 font-bold',
+    success: 'bg-emerald-100 text-emerald-950 border border-emerald-600 font-bold',
+    warning: 'bg-amber-100 text-amber-950 border border-amber-600 font-bold',
+    danger: 'bg-rose-100 text-rose-950 border border-rose-600 font-bold',
+    info: 'bg-sky-100 text-sky-950 border border-sky-600 font-bold',
+    purple: 'bg-purple-100 text-purple-950 border border-purple-600 font-bold',
+    saffron: 'bg-orange-100 text-orange-950 border border-orange-600 font-bold',
+    neutral: 'bg-slate-100 text-slate-800 border border-slate-400 font-semibold',
   };
-  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${variants[variant]}`}>{children}</span>;
+  return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs md:text-sm font-bold shadow-2xs ${variants[variant] || variants.default} ${className}`}>{children}</span>;
 }
 
 /** ErrorBoundary that auto-closes the modal if children crash */
@@ -473,7 +476,7 @@ class ModalErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-4 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
+        <div className="p-4 text-base text-red-700 bg-red-50 rounded-lg border-2 border-red-300 font-medium">
           Something went wrong displaying this content. The modal will close automatically.
         </div>
       );
@@ -486,8 +489,6 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
   // Safety: force-clean pointer-events on document.body when modal mounts/unmounts
   useEffect(() => {
     if (!open) return;
-    // Some libraries or race conditions can set pointer-events: none on body
-    // Always ensure it's reset when our modal is active and when it closes
     const cleanup = () => {
       if (document.body.style.pointerEvents === 'none') {
         document.body.style.pointerEvents = '';
@@ -509,7 +510,6 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
     } catch (err) {
       console.error('[Modal] onClose error:', err);
     }
-    // Safety: always clean up pointer-events regardless
     if (document.body.style.pointerEvents === 'none') {
       document.body.style.pointerEvents = '';
     }
@@ -517,17 +517,17 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
-      <div className="fixed inset-0 bg-black/40" onClick={safeClose} />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs" onClick={safeClose} />
       <div
-        className={`relative bg-white rounded-xl shadow-xl w-full ${sizes[size]} flex flex-col overflow-hidden`}
+        className={`relative bg-white rounded-xl shadow-2xl w-full ${sizes[size]} flex flex-col overflow-hidden border-2 border-forest-700/30`}
         style={{ maxHeight: 'calc(100vh - 1.5rem)' }}
       >
-        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-line">
-          <h3 className="font-display text-lg font-semibold">{title}</h3>
-          <button type="button" onClick={safeClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
+        <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b-2 border-line bg-surface/70">
+          <h3 className="font-display text-xl font-bold text-forest-950">{title}</h3>
+          <button type="button" onClick={safeClose} className="text-muted hover:text-ink text-2xl leading-none font-bold cursor-pointer">&times;</button>
         </div>
         <div
-          className={`px-5 py-3 min-h-0 ${
+          className={`px-5 py-4 min-h-0 ${
             scrollable || footer
               ? 'flex-1 overflow-y-auto overflow-x-hidden overscroll-contain panel-scroll'
               : 'overflow-visible'
@@ -538,7 +538,7 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
           </ModalErrorBoundary>
         </div>
         {footer && (
-          <div className="shrink-0 w-full px-5 py-3 border-t border-line bg-white">
+          <div className="shrink-0 w-full px-5 py-3 border-t-2 border-line bg-white">
             {footer}
           </div>
         )}
@@ -550,15 +550,15 @@ export function Modal({ open, onClose, title, children, size = 'md', scrollable 
 
 export function Alert({ type = 'info', children, onClose }) {
   const types = {
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-    success: 'bg-green-50 border-green-200 text-green-800',
-    warning: 'bg-saffron-100 border-saffron-500/30 text-saffron-500',
-    error: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-sky-50 border-2 border-sky-400 text-sky-950',
+    success: 'bg-emerald-50 border-2 border-emerald-500 text-emerald-950',
+    warning: 'bg-amber-50 border-2 border-amber-500 text-amber-950',
+    error: 'bg-rose-50 border-2 border-rose-500 text-rose-950',
   };
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-lg border ${types[type]}`}>
-      <div className="flex-1 text-sm">{children}</div>
-      {onClose && <button onClick={onClose} className="text-current opacity-60 hover:opacity-100">&times;</button>}
+    <div className={`flex items-start gap-3 p-4 rounded-xl shadow-xs font-medium text-base ${types[type]}`}>
+      <div className="flex-1 leading-relaxed">{children}</div>
+      {onClose && <button onClick={onClose} className="text-current opacity-70 hover:opacity-100 text-xl font-bold cursor-pointer">&times;</button>}
     </div>
   );
 }
@@ -568,23 +568,23 @@ export function Table({ columns, data, onRowClick, showNumber = false, maxHeight
     <div
       className={
         maxHeight
-          ? 'overflow-auto w-full border border-line rounded-lg'
+          ? 'overflow-auto w-full border-2 border-line rounded-xl shadow-xs'
           : fit
-            ? 'overflow-visible w-full'
+            ? 'overflow-visible w-full border border-line rounded-xl'
             : 'w-full'
       }
       style={maxHeight ? { maxHeight } : undefined}
     >
-      <table className={`text-sm border-collapse ${fit ? 'w-full table-fixed' : 'w-max min-w-full'}`}>
+      <table className={`text-base border-collapse ${fit ? 'w-full table-fixed' : 'w-max min-w-full'}`}>
         <thead className="sticky top-0 z-10">
-          <tr className="border-b border-line bg-surface">
+          <tr className="border-b-2 border-forest-700 bg-forest-50">
             {showNumber && (
-              <th className={`px-4 py-3 text-left font-medium text-muted bg-surface whitespace-nowrap ${fit ? 'w-12 px-2 py-2.5 text-xs' : ''}`}>Count</th>
+              <th className={`px-4 py-3 text-left font-bold text-forest-950 bg-forest-100/90 uppercase tracking-wider text-xs whitespace-nowrap ${fit ? 'w-14 px-2 py-2.5' : ''}`}>#</th>
             )}
             {columns.map(col => (
               <th
                 key={col.key}
-                className={`px-4 py-3 text-left font-medium text-muted bg-surface whitespace-nowrap ${fit ? 'px-2 py-2.5 text-xs truncate' : ''} ${col.className || ''}`}
+                className={`px-4 py-3 text-left font-bold text-forest-950 bg-forest-100/90 uppercase tracking-wider text-xs whitespace-nowrap ${fit ? 'px-2 py-2.5 truncate' : ''} ${col.className || ''}`}
               >
                 {col.label}
               </th>
@@ -594,7 +594,7 @@ export function Table({ columns, data, onRowClick, showNumber = false, maxHeight
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length + (showNumber ? 1 : 0)} className="px-4 py-8 text-center text-muted">No records found</td>
+              <td colSpan={columns.length + (showNumber ? 1 : 0)} className="px-4 py-8 text-center text-muted font-medium">No records found</td>
             </tr>
           ) : data.map((row, i) => {
             const customRowClass = getRowClassName ? getRowClassName(row, i) : '';
@@ -602,15 +602,15 @@ export function Table({ columns, data, onRowClick, showNumber = false, maxHeight
               <tr
                 key={row.id ?? i}
                 onClick={() => onRowClick?.(row)}
-                className={`border-b border-line/50 hover:bg-surface/30 ${onRowClick ? 'cursor-pointer' : ''} ${customRowClass}`}
+                className={`border-b border-line hover:bg-forest-50/60 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${i % 2 === 1 ? 'bg-surface/40' : 'bg-white'} ${customRowClass}`}
               >
               {showNumber && (
-                <td className={`px-4 py-3 whitespace-nowrap font-medium text-ink ${fit ? 'px-2 py-2 text-xs' : ''}`}>{i + 1}</td>
+                <td className={`px-4 py-3 whitespace-nowrap font-bold text-forest-800 ${fit ? 'px-2 py-2 text-xs' : ''}`}>{i + 1}</td>
               )}
               {columns.map(col => (
                 <td
                   key={col.key}
-                  className={`px-4 py-3 whitespace-nowrap ${fit ? 'px-2 py-2 text-xs truncate' : ''} ${col.className || ''}`}
+                  className={`px-4 py-3 whitespace-nowrap font-medium text-ink ${fit ? 'px-2 py-2 text-xs truncate' : ''} ${col.className || ''}`}
                   title={fit && !col.render ? String(row[col.key] ?? '') : undefined}
                 >
                   {col.render ? col.render(row, i) : row[col.key]}
