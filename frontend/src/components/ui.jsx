@@ -661,3 +661,6 @@ export function PageHeader({ title, subtitle, action, className = '' }) {
     </div>
   );
 }
+
+export { default as PrintPreviewModal } from './PrintPreviewModal';
+

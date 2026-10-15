@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle, Lock, Unlock, Key } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert, Modal } from '../../components/ui';
+import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert, Modal, PrintPreviewModal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi, settingsApi } from '../../api';
 import { printHtml } from '../../utils/print';
@@ -177,6 +177,10 @@ export default function FormulaPage() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSpecificMedId, setPrintSpecificMedId] = useState('');
   const [printingFormula, setPrintingFormula] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewTitle, setPreviewTitle] = useState('Formula Print Preview');
+  const [previewSubtitle, setPreviewSubtitle] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [consumeConfirmOpen, setConsumeConfirmOpen] = useState(false);
 
@@ -767,8 +771,8 @@ export default function FormulaPage() {
     }
   };
 
-  const handlePrintGenerated = () => {
-    if (!generated?.items?.length) return;
+  const buildGeneratedFormulaHtml = () => {
+    if (!generated?.items?.length) return '';
     const selected = medicineOptions.find(o => String(o.medicineCodeId) === String(selectedMedicineCodeId));
     const code = generated.medicineCode || selected?.code || '—';
     const name = generated.medicineName || selected?.name || '—';
@@ -791,24 +795,26 @@ export default function FormulaPage() {
       </tr>
     `).join('');
 
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Generated Formula — ${esc(code)}</title>
   <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
-    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
-    .sub { color: #5c6b60; margin-bottom: 16px; }
-    h1 { font-size: 16px; margin: 0 0 12px; letter-spacing: 0.04em; }
-    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; }
-    .meta div span { color: #5c6b60; display: inline-block; min-width: 110px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #d5e0d8; padding: 8px; }
-    th { background: #e8f2eb; color: #2d5a3d; text-align: left; }
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; padding: 20px; font-size: 14px; }
+    .brand { font-size: 22px; font-weight: 800; color: #1e3a2b; letter-spacing: 0.5px; }
+    .sub { font-size: 13px; color: #475569; margin-bottom: 12px; font-weight: 500; }
+    h1 { font-size: 18px; margin: 0 0 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; border-bottom: 2px solid #1e3a2b; padding-bottom: 6px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; font-size: 13.5px; }
+    .meta div span { color: #475569; display: inline-block; min-width: 120px; font-weight: 500; }
+    .meta div strong { color: #0f172a; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13.5px; }
+    th, td { border: 1px solid #94a3b8; padding: 7px 10px; }
+    th { background: #e8efe9; color: #143521; text-align: left; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { font-size: 13.5px; color: #0f172a; }
     .c { text-align: center; } .r { text-align: right; }
-    .foot { margin-top: 24px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; }
-    @media print { body { padding: 0; } }
+    .foot { margin-top: 24px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; }
+    @media print { body { padding: 0; } @page { margin: 10mm; size: auto; } }
   </style>
 </head>
 <body>
@@ -840,8 +846,22 @@ export default function FormulaPage() {
   <div class="foot">Computer-generated formula sheet — ${esc(displayFirm)}</div>
 </body>
 </html>`;
+  };
 
+  const handlePrintGenerated = () => {
+    const html = buildGeneratedFormulaHtml();
+    if (!html) return;
     printHtml(html);
+  };
+
+  const handlePreviewGenerated = () => {
+    const html = buildGeneratedFormulaHtml();
+    if (!html) return;
+    const selected = medicineOptions.find(o => String(o.medicineCodeId) === String(selectedMedicineCodeId));
+    setPreviewTitle(`Formula Sheet: ${generated?.medicineCode || selected?.code || ''}`);
+    setPreviewSubtitle(`${generated?.medicineName || selected?.name || ''} — Batch: ${batchNumber || 'N/A'}`);
+    setPreviewHtml(html);
+    setPreviewModalOpen(true);
   };
 
   const handleConsume = () => {
@@ -875,98 +895,98 @@ export default function FormulaPage() {
     }
   };
 
-  const handlePrintSpecificFormula = async (medId) => {
+  const buildSpecificFormulaHtml = async (medId) => {
     const targetId = medId || selectedMedicineCodeId;
-    if (!targetId) return;
+    if (!targetId) return null;
 
     const med = medicineOptions.find(m => String(m.medicineCodeId) === String(targetId));
-    setPrintingFormula(true);
-    try {
-      let recipeData = [];
-      let baseQty = med?.formulaQuantity ?? 1;
-      let baseUnit = med?.formulaUnit || 'PIECES';
-      let medDesc = med?.description || '';
+    let recipeData = [];
+    let baseQty = med?.formulaQuantity ?? 1;
+    let baseUnit = med?.formulaUnit || 'PIECES';
+    let medDesc = med?.description || '';
 
-      if (String(targetId) === String(selectedMedicineCodeId) && recipe.length > 0) {
-        recipeData = recipe.map(r => {
-          const herb = herbs.find(h => String(h.id) === String(r.herbId));
-          const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId))
-            || herbOptions.find(o => String(o.herbId) === String(r.herbId));
-          return {
-            herbCode: opt?.code || herb?.herbCode || '—',
-            herbName: r.herbName || opt?.name || herb?.name || 'Herb',
-            quantity: r.quantity,
-            unit: r.unit,
-          };
-        });
-        baseQty = formulaQuantity;
-        baseUnit = formulaUnit;
-        medDesc = description;
-      } else {
-        const data = await medicineCodesApi.getRecipe(targetId);
-        const items = data.items || [];
-        baseQty = data.formulaQuantity ?? med?.formulaQuantity ?? 1;
-        baseUnit = data.formulaUnit || med?.formulaUnit || 'PIECES';
-        medDesc = data.description || med?.description || '';
-        recipeData = items.map(r => {
-          const herb = herbs.find(h => h.id === r.herbId);
-          const opt = herbOptions.find(o => o.herbId === r.herbId)
-            || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
-          return {
-            herbCode: opt?.code || herb?.herbCode || '—',
-            herbName: r.herbName || herb?.name || opt?.name || 'Herb',
-            quantity: r.quantity ?? '',
-            unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
-          };
-        });
-      }
+    if (String(targetId) === String(selectedMedicineCodeId) && recipe.length > 0) {
+      recipeData = recipe.map(r => {
+        const herb = herbs.find(h => String(h.id) === String(r.herbId));
+        const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId))
+          || herbOptions.find(o => String(o.herbId) === String(r.herbId));
+        return {
+          herbCode: opt?.code || herb?.herbCode || '—',
+          herbName: r.herbName || opt?.name || herb?.name || 'Herb',
+          quantity: r.quantity,
+          unit: r.unit,
+        };
+      });
+      baseQty = formulaQuantity;
+      baseUnit = formulaUnit;
+      medDesc = description;
+    } else {
+      const data = await medicineCodesApi.getRecipe(targetId);
+      const items = data.items || [];
+      baseQty = data.formulaQuantity ?? med?.formulaQuantity ?? 1;
+      baseUnit = data.formulaUnit || med?.formulaUnit || 'PIECES';
+      medDesc = data.description || med?.description || '';
+      recipeData = items.map(r => {
+        const herb = herbs.find(h => h.id === r.herbId);
+        const opt = herbOptions.find(o => o.herbId === r.herbId)
+          || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
+        return {
+          herbCode: opt?.code || herb?.herbCode || '—',
+          herbName: r.herbName || herb?.name || opt?.name || 'Herb',
+          quantity: r.quantity ?? '',
+          unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
+        };
+      });
+    }
 
-      if (!recipeData.length) {
-        setMessage(`No formula ingredients configured for ${med?.code || 'this medicine'}.`);
-        return;
-      }
+    if (!recipeData.length) {
+      setMessage(`No formula ingredients configured for ${med?.code || 'this medicine'}.`);
+      return null;
+    }
 
-      const esc = (s) => String(s ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    const esc = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
 
-      const code = med?.code || '—';
-      const name = med?.name || '—';
+    const code = med?.code || '—';
+    const name = med?.name || '—';
 
-      const rows = recipeData.map((r, i) => `
-        <tr>
-          <td class="c">${i + 1}</td>
-          <td class="code">${esc(r.herbCode)}</td>
-          <td class="bold">${esc(r.herbName)}</td>
-          <td class="r">${esc(r.quantity)} ${esc(r.unit)}</td>
-        </tr>
-      `).join('');
+    const rows = recipeData.map((r, i) => `
+      <tr>
+        <td class="c">${i + 1}</td>
+        <td class="code">${esc(r.herbCode)}</td>
+        <td class="bold">${esc(r.herbName)}</td>
+        <td class="r">${esc(r.quantity)} ${esc(r.unit)}</td>
+      </tr>
+    `).join('');
 
-      const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Formula — ${esc(code)}</title>
   <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
-    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
-    .sub { color: #5c6b60; margin-bottom: 14px; font-size: 11px; }
-    h1 { font-size: 16px; margin: 0 0 12px; letter-spacing: 0.04em; border-bottom: 2px solid #2d5a3d; padding-bottom: 4px; }
-    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; background: #f6faf7; padding: 12px; border: 1px solid #d5e0d8; border-radius: 6px; }
-    .meta div span { color: #5c6b60; display: inline-block; min-width: 120px; font-size: 11px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #d5e0d8; padding: 7px 10px; }
-    th { background: #e8f2eb; color: #2d5a3d; text-align: left; font-size: 11px; text-transform: uppercase; }
-    tr:nth-child(even) { background: #fafcfa; }
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; padding: 20px; font-size: 14px; }
+    .brand { font-size: 22px; font-weight: 800; color: #1e3a2b; letter-spacing: 0.5px; }
+    .sub { font-size: 13px; color: #475569; margin-bottom: 12px; font-weight: 500; }
+    h1 { font-size: 18px; margin: 0 0 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; border-bottom: 2px solid #1e3a2b; padding-bottom: 6px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; background: #f6faf7; padding: 14px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 13.5px; }
+    .meta div span { color: #475569; display: inline-block; min-width: 130px; font-size: 13px; font-weight: 500; }
+    .meta div strong { color: #0f172a; font-weight: 700; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
+    th, td { border: 1px solid #94a3b8; padding: 7px 10px; }
+    th { background: #e8efe9; color: #143521; text-align: left; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { font-size: 13.5px; color: #0f172a; }
+    tr:nth-child(even) { background: #f8faf8; }
     .c { text-align: center; } .r { text-align: right; }
-    .code { font-family: monospace; font-weight: 700; color: #2d5a3d; }
-    .bold { font-weight: 600; }
-    .foot { margin-top: 30px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; display: flex; justify-content: space-between; }
-    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; font-size: 11px; }
-    .signatures div { border-top: 1px solid #aaa; padding-top: 6px; text-align: center; color: #444; }
-    @media print { body { padding: 0; } @page { margin: 10mm; } }
+    .code { font-family: monospace; font-weight: 700; font-size: 14px; color: #143521; }
+    .bold { font-weight: 700; font-size: 14px; color: #0f172a; }
+    .foot { margin-top: 30px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; display: flex; justify-content: space-between; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; font-size: 13px; font-weight: 600; color: #111827; }
+    .signatures div { border-top: 1px solid #94a3b8; padding-top: 8px; text-align: center; color: #334155; }
+    @media print { body { padding: 0; } @page { margin: 10mm; size: auto; } }
   </style>
 </head>
 <body>
@@ -1003,7 +1023,16 @@ export default function FormulaPage() {
 </body>
 </html>`;
 
-      printHtml(html);
+    return { code, name, html };
+  };
+
+  const handlePrintSpecificFormula = async (medId) => {
+    setPrintingFormula(true);
+    try {
+      const res = await buildSpecificFormulaHtml(medId);
+      if (res?.html) {
+        printHtml(res.html);
+      }
     } catch (err) {
       console.error(err);
       setMessage('Failed to load formula recipe for printing.');
@@ -1012,7 +1041,25 @@ export default function FormulaPage() {
     }
   };
 
-  const handlePrintFormulaList = () => {
+  const handlePreviewSpecificFormula = async (medId) => {
+    setPrintingFormula(true);
+    try {
+      const res = await buildSpecificFormulaHtml(medId);
+      if (res?.html) {
+        setPreviewTitle(`Formula Specification: ${res.code}`);
+        setPreviewSubtitle(res.name);
+        setPreviewHtml(res.html);
+        setPreviewModalOpen(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to load formula recipe for preview.');
+    } finally {
+      setPrintingFormula(false);
+    }
+  };
+
+  const buildFormulaListHtml = () => {
     const list = filteredMedicines;
     const esc = (s) => String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -1033,27 +1080,28 @@ export default function FormulaPage() {
       </tr>
     `).join('');
 
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Medicine Formulas Directory — Uttam Laboratories</title>
   <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
-    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
-    .sub { color: #5c6b60; margin-bottom: 12px; font-size: 11px; }
-    h1 { font-size: 15px; margin: 0 0 12px; font-weight: 700; border-bottom: 2px solid #2d5a3d; padding-bottom: 4px; }
-    .meta { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 14px; font-size: 11px; color: #5c6b60; }
-    .meta strong { color: #1c241e; margin-left: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-    th, td { border: 1px solid #d5e0d8; padding: 6px 8px; text-align: left; }
-    th { background: #e8f2eb; color: #2d5a3d; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-    tr:nth-child(even) { background: #fafcfa; }
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; padding: 20px; font-size: 14px; }
+    .brand { font-size: 22px; font-weight: 800; color: #1e3a2b; letter-spacing: 0.5px; }
+    .sub { font-size: 13px; color: #475569; margin-bottom: 12px; font-size: 13px; font-weight: 500; }
+    h1 { font-size: 18px; margin: 0 0 14px; font-weight: 800; color: #0f172a; border-bottom: 2px solid #1e3a2b; padding-bottom: 6px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 14px; font-size: 13px; color: #475569; }
+    .meta strong { color: #0f172a; font-weight: 700; margin-left: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13.5px; }
+    th, td { border: 1px solid #94a3b8; padding: 7px 10px; text-align: left; }
+    th { background: #e8efe9; color: #143521; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { font-size: 13.5px; color: #0f172a; }
+    tr:nth-child(even) { background: #f8faf8; }
     .c { text-align: center; } .r { text-align: right; }
-    .code { font-family: monospace; font-weight: 700; color: #2d5a3d; }
-    .bold { font-weight: 600; }
-    .foot { margin-top: 24px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; display: flex; justify-content: space-between; }
-    @media print { body { padding: 0; } @page { margin: 10mm; } }
+    .code { font-family: monospace; font-weight: 700; font-size: 14px; color: #143521; }
+    .bold { font-weight: 700; font-size: 14px; color: #0f172a; }
+    .foot { margin-top: 24px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; display: flex; justify-content: space-between; }
+    @media print { body { padding: 0; } @page { margin: 10mm; size: auto; } }
   </style>
 </head>
 <body>
@@ -1084,8 +1132,21 @@ export default function FormulaPage() {
   </div>
 </body>
 </html>`;
+  };
 
+  const handlePrintFormulaList = () => {
+    const html = buildFormulaListHtml();
+    if (!html) return;
     printHtml(html);
+  };
+
+  const handlePreviewFormulaList = () => {
+    const html = buildFormulaListHtml();
+    if (!html) return;
+    setPreviewTitle('Medicine Formulas Directory');
+    setPreviewSubtitle(`${filteredMedicines.length} medicine records`);
+    setPreviewHtml(html);
+    setPreviewModalOpen(true);
   };
 
   const selectedMedicine = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
@@ -2001,6 +2062,13 @@ export default function FormulaPage() {
                       </div>
                       <Table columns={generateColumns} data={generated.items} />
                       <div className="flex gap-2 flex-wrap items-center">
+                        <Button
+                          variant="secondary"
+                          onClick={handlePreviewGenerated}
+                          className="flex items-center gap-1.5 border-2 border-forest-600 text-forest-800 font-bold"
+                        >
+                          <Eye className="w-4 h-4 text-forest-600" /> Print Preview
+                        </Button>
                         <Button variant="secondary" onClick={handlePrintGenerated}>
                           <Printer className="w-4 h-4" /> Print Formula
                         </Button>
@@ -2083,16 +2151,29 @@ export default function FormulaPage() {
                   Prints a comprehensive directory table listing all {filteredMedicines.length} medicine codes, base quantities, and configuration status.
                 </p>
               </div>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setShowPrintModal(false);
-                  handlePrintFormulaList();
-                }}
-                className="whitespace-nowrap shrink-0"
-              >
-                Print All List
-              </Button>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowPrintModal(false);
+                    handlePreviewFormulaList();
+                  }}
+                  className="whitespace-nowrap flex items-center gap-1.5 border-2 border-forest-600 text-forest-800 font-bold"
+                >
+                  <Eye className="w-4 h-4 text-forest-600" /> Preview All
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setShowPrintModal(false);
+                    handlePrintFormulaList();
+                  }}
+                  className="whitespace-nowrap shrink-0"
+                >
+                  Print All List
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -2123,17 +2204,31 @@ export default function FormulaPage() {
                   })),
                 ]}
               />
-              <Button
-                size="sm"
-                disabled={!printSpecificMedId || printingFormula}
-                onClick={() => {
-                  setShowPrintModal(false);
-                  handlePrintSpecificFormula(printSpecificMedId);
-                }}
-                className="whitespace-nowrap shrink-0"
-              >
-                {printingFormula ? 'Loading...' : 'Print Formula'}
-              </Button>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!printSpecificMedId || printingFormula}
+                  onClick={() => {
+                    setShowPrintModal(false);
+                    handlePreviewSpecificFormula(printSpecificMedId);
+                  }}
+                  className="whitespace-nowrap flex items-center gap-1.5 border-2 border-forest-600 text-forest-800 font-bold"
+                >
+                  <Eye className="w-4 h-4 text-forest-600" /> Preview Formula
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!printSpecificMedId || printingFormula}
+                  onClick={() => {
+                    setShowPrintModal(false);
+                    handlePrintSpecificFormula(printSpecificMedId);
+                  }}
+                  className="whitespace-nowrap shrink-0"
+                >
+                  {printingFormula ? 'Loading...' : 'Print Formula'}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -2273,6 +2368,14 @@ export default function FormulaPage() {
           </div>
         </div>
       </Modal>
+
+      <PrintPreviewModal
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        title={previewTitle}
+        subtitle={previewSubtitle}
+        html={previewHtml}
+      />
     </Layout>
   );
 }

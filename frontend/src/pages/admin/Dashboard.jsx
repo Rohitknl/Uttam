@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Package, Printer } from 'lucide-react';
+import { AlertTriangle, Package, Printer, Eye } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardHeader, CardBody, Badge, Button, LoadingSpinner, PageHeader, Modal } from '../../components/ui';
+import { Card, CardHeader, CardBody, Badge, Button, LoadingSpinner, PageHeader, Modal, PrintPreviewModal } from '../../components/ui';
 import { analyticsApi } from '../../api';
 import { printHtml } from '../../utils/print';
 
@@ -29,27 +29,30 @@ const TILES = {
   },
 };
 
-function printList(title, rowsHtml) {
+function buildDashboardPrintHtml(title, rowsHtml) {
+  if (!rowsHtml) return '';
   const esc = (s) => String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>${esc(title)}</title>
   <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
-    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
-    .sub { color: #5c6b60; margin-bottom: 16px; }
-    h1 { font-size: 16px; margin: 0 0 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #d5e0d8; padding: 8px; text-align: left; }
-    th { background: #e8f2eb; color: #2d5a3d; }
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; padding: 20px; font-size: 14px; }
+    .brand { font-size: 22px; font-weight: 800; color: #1e3a2b; letter-spacing: 0.5px; }
+    .sub { font-size: 13px; color: #475569; margin-bottom: 12px; font-weight: 500; }
+    h1 { font-size: 18px; margin: 0 0 14px; font-weight: 800; color: #0f172a; border-bottom: 2px solid #1e3a2b; padding-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13.5px; }
+    th, td { border: 1px solid #94a3b8; padding: 7px 10px; text-align: left; }
+    th { background: #e8efe9; color: #143521; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { font-size: 13.5px; color: #0f172a; }
     .r { text-align: right; }
-    .foot { margin-top: 24px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; }
+    .foot { margin-top: 24px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; }
+    @media print { body { padding: 0; } @page { margin: 10mm; size: auto; } }
   </style>
 </head>
 <body>
@@ -63,7 +66,6 @@ function printList(title, rowsHtml) {
   <div class="foot">${esc(rowsHtml.count)} record(s)</div>
 </body>
 </html>`;
-  printHtml(html);
 }
 
 function buildPrintRows(type, items) {
@@ -112,6 +114,8 @@ export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
 
   useEffect(() => {
     analyticsApi.admin().then(setData).finally(() => setLoading(false));
@@ -132,7 +136,17 @@ export default function AdminDashboard() {
 
   const handlePrint = () => {
     if (!active) return;
-    printList(active.label, buildPrintRows(popup, activeItems));
+    const html = buildDashboardPrintHtml(active.label, buildPrintRows(popup, activeItems));
+    if (!html) return;
+    printHtml(html);
+  };
+
+  const handlePreview = () => {
+    if (!active) return;
+    const html = buildDashboardPrintHtml(active.label, buildPrintRows(popup, activeItems));
+    if (!html) return;
+    setPreviewHtml(html);
+    setPreviewModalOpen(true);
   };
 
   return (
@@ -248,7 +262,15 @@ export default function AdminDashboard() {
         footer={(
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setPopup(null)}>Close</Button>
-            <Button onClick={handlePrint} disabled={!activeItems.length}>
+            <Button
+              variant="secondary"
+              onClick={handlePreview}
+              disabled={!activeItems.length}
+              className="flex items-center gap-1.5 border-2 border-forest-600 text-forest-800 font-bold"
+            >
+              <Eye className="w-4 h-4 text-forest-600" /> Print Preview
+            </Button>
+            <Button onClick={handlePrint} disabled={!activeItems.length} className="flex items-center gap-1.5">
               <Printer className="w-4 h-4" /> Print
             </Button>
           </div>
@@ -343,6 +365,14 @@ export default function AdminDashboard() {
           </div>
         )}
       </Modal>
+
+      <PrintPreviewModal
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        title={active?.label || 'Dashboard Report'}
+        subtitle={`${activeItems.length} record(s)`}
+        html={previewHtml}
+      />
     </Layout>
   );
 }

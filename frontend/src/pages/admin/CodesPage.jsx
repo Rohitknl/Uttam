@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Printer } from 'lucide-react';
+import { Plus, Pencil, Trash2, Printer, Eye } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Modal, Input, Select, Textarea, Table, Badge, SearchBar, PageHeader, LoadingSpinner, Alert } from '../../components/ui';
+import { Card, CardBody, Button, Modal, Input, Select, Textarea, Table, Badge, SearchBar, PageHeader, LoadingSpinner, Alert, PrintPreviewModal } from '../../components/ui';
+
 import { useAuth } from '../../context/AuthContext';
 import { parseHerbCode } from '../../utils/codeParser';
 import { printHtml } from '../../utils/print';
@@ -143,6 +144,8 @@ export default function CodesPage({
   const [deletePassword, setDeletePassword] = useState('');
   const [error, setError] = useState('');
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
   const [printMode, setPrintMode] = useState('all'); // 'all', 'codeRange', 'rowRange', 'series'
   const [fromCode, setFromCode] = useState('');
   const [toCode, setToCode] = useState('');
@@ -344,8 +347,8 @@ export default function CodesPage({
     setPrintModalOpen(true);
   };
 
-  const handlePrint = () => {
-    if (!printableItems.length) return;
+  const buildCodesPrintHtml = () => {
+    if (!printableItems.length) return '';
 
     const esc = (s) => String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -375,25 +378,26 @@ export default function CodesPage({
       </tr>
     `).join('');
 
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>${esc(title)} — Uttam Laboratories</title>
   <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; color: #1c241e; padding: 24px; font-size: 12px; }
-    .brand { font-size: 20px; font-weight: 700; color: #2d5a3d; }
-    .sub { color: #5c6b60; margin-bottom: 12px; }
-    h1 { font-size: 16px; margin: 0 0 8px; letter-spacing: 0.04em; color: #1c241e; }
-    .meta { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-bottom: 16px; font-size: 12px; color: #5c6b60; border-bottom: 1px solid #d5e0d8; padding-bottom: 10px; }
-    .meta strong { color: #1c241e; margin-left: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #d5e0d8; padding: 7px 10px; text-align: left; }
-    th { background: #e8f2eb; color: #2d5a3d; font-weight: 600; }
-    tr:nth-child(even) { background: #fbfdfc; }
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; padding: 20px; font-size: 14px; }
+    .brand { font-size: 22px; font-weight: 800; color: #1e3a2b; letter-spacing: 0.5px; }
+    .sub { font-size: 13px; color: #475569; margin-bottom: 10px; font-weight: 500; }
+    h1 { font-size: 18px; margin: 0 0 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; border-bottom: 2px solid #1e3a2b; padding-bottom: 6px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 14px; font-size: 13px; color: #475569; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px; }
+    .meta strong { color: #0f172a; font-weight: 700; margin-left: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13.5px; }
+    th, td { border: 1px solid #94a3b8; padding: 7px 10px; text-align: left; }
+    th { background: #e8efe9; color: #143521; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { font-size: 13.5px; color: #0f172a; }
+    tr:nth-child(even) { background: #f8faf8; }
     .c { text-align: center; }
     .r { text-align: right; }
-    .foot { margin-top: 24px; color: #5c6b60; font-size: 11px; border-top: 1px dashed #c5d0c8; padding-top: 8px; display: flex; justify-content: space-between; }
+    .foot { margin-top: 24px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; display: flex; justify-content: space-between; }
     @media print {
       body { padding: 0; }
       @page { margin: 10mm; size: auto; }
@@ -428,9 +432,20 @@ export default function CodesPage({
   </div>
 </body>
 </html>`;
+  };
 
+  const handlePrint = () => {
+    const html = buildCodesPrintHtml();
+    if (!html) return;
     printHtml(html);
     setPrintModalOpen(false);
+  };
+
+  const handlePreview = () => {
+    const html = buildCodesPrintHtml();
+    if (!html) return;
+    setPreviewHtml(html);
+    setPreviewModalOpen(true);
   };
 
   const columns = [
@@ -739,12 +754,28 @@ export default function CodesPage({
             <Button variant="secondary" onClick={() => setPrintModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handlePrint} disabled={printableItems.length === 0}>
+            <Button
+              variant="secondary"
+              onClick={handlePreview}
+              disabled={printableItems.length === 0}
+              className="flex items-center gap-1.5 border-2 border-forest-600 text-forest-800 font-bold"
+            >
+              <Eye className="w-4 h-4 text-forest-600" /> Print Preview
+            </Button>
+            <Button onClick={handlePrint} disabled={printableItems.length === 0} className="flex items-center gap-1.5">
               <Printer className="w-4 h-4" /> Print Sheet
             </Button>
           </div>
         </div>
       </Modal>
+
+      <PrintPreviewModal
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        title={`${title} Directory`}
+        subtitle={`${printableItems.length} record(s) selected`}
+        html={previewHtml}
+      />
     </Layout>
   );
 }

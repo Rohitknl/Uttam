@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Trash2, Pencil, Printer } from 'lucide-react';
+import { Plus, Trash2, Pencil, Printer, Eye } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Modal, Input, Select, DropdownSelect, Combobox, Table, SearchBar, PageHeader, LoadingSpinner, Alert, Textarea } from '../../components/ui';
+import { Card, CardBody, Button, Modal, Input, Select, DropdownSelect, Combobox, Table, SearchBar, PageHeader, LoadingSpinner, Alert, Textarea, PrintPreviewModal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { billsApi, herbCodesApi, inventoryApi } from '../../api';
 import { printHtml } from '../../utils/print';
@@ -140,6 +140,8 @@ export default function BillsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [missingFields, setMissingFields] = useState([]);
   const [partyDirectory, setPartyDirectory] = useState({ suppliers: [], consignees: [] });
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
 
   const setActiveTab = (tab) => {
     if (tab === 'bills') setSearchParams({});
@@ -421,8 +423,8 @@ export default function BillsPage() {
     }
   };
 
-  const handlePrintHistory = () => {
-    if (!queryResult) return;
+  const buildHistoryPrintHtml = () => {
+    if (!queryResult) return '';
     const invoices = queryResult.invoices?.length
       ? queryResult.invoices
       : null;
@@ -581,14 +583,14 @@ export default function BillsPage() {
       margin: 0;
       padding: 16px;
       font-family: "Segoe UI", Arial, sans-serif;
-      color: #1c241e;
+      color: #111827;
       background: #fff;
-      font-size: 12px;
+      font-size: 14px;
     }
     .invoice {
       max-width: 900px;
       margin: 0 auto 24px;
-      border: 1px solid #c5d0c8;
+      border: 1px solid #94a3b8;
       padding: 24px;
       page-break-after: always;
     }
@@ -597,27 +599,30 @@ export default function BillsPage() {
       display: flex;
       justify-content: space-between;
       gap: 24px;
-      border-bottom: 2px solid #2d5a3d;
+      border-bottom: 2px solid #1e3a2b;
       padding-bottom: 14px;
       margin-bottom: 16px;
     }
-    .brand { font-size: 22px; font-weight: 700; color: #2d5a3d; }
-    .sub { color: #5c6b60; margin-top: 2px; }
+    .brand { font-size: 24px; font-weight: 800; color: #1e3a2b; }
+    .sub { color: #475569; margin-top: 2px; font-size: 13px; font-weight: 500; }
     .doc-title {
-      font-size: 16px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 800;
       letter-spacing: 0.08em;
       text-align: right;
       margin-bottom: 8px;
+      color: #0f172a;
     }
     .meta {
       display: flex;
       justify-content: flex-end;
-      gap: 12px;
-      font-size: 12px;
+      gap: 14px;
+      font-size: 13px;
       margin-top: 2px;
+      color: #475569;
     }
-    .meta span { color: #5c6b60; min-width: 90px; text-align: right; }
+    .meta span { color: #475569; min-width: 95px; text-align: right; font-weight: 500; }
+    .meta strong { color: #0f172a; font-weight: 700; }
     .parties {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -625,37 +630,43 @@ export default function BillsPage() {
       margin-bottom: 16px;
     }
     .box {
-      border: 1px solid #d5e0d8;
+      border: 1px solid #94a3b8;
       border-radius: 6px;
-      padding: 10px 12px;
-      min-height: 88px;
+      padding: 12px 14px;
+      min-height: 90px;
+      font-size: 13.5px;
     }
     .box-label {
-      font-size: 10px;
+      font-size: 11.5px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #5c6b60;
-      margin-bottom: 4px;
-      font-weight: 600;
+      color: #475569;
+      margin-bottom: 5px;
+      font-weight: 700;
     }
-    .name { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
-    .addr { white-space: pre-wrap; color: #334038; margin-top: 4px; }
+    .name { font-weight: 700; font-size: 14.5px; margin-bottom: 4px; color: #0f172a; }
+    .addr { white-space: pre-wrap; color: #334155; margin-top: 4px; font-size: 13px; }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 14px;
+      font-size: 13.5px;
     }
     th, td {
-      border: 1px solid #d5e0d8;
-      padding: 7px 8px;
+      border: 1px solid #94a3b8;
+      padding: 7px 10px;
       vertical-align: top;
     }
     th {
-      background: #e8f2eb;
-      color: #2d5a3d;
-      font-weight: 600;
+      background: #e8efe9;
+      color: #143521;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
       text-align: left;
     }
+    td { font-size: 13.5px; color: #0f172a; }
     .c { text-align: center; }
     .r { text-align: right; }
     .totals-wrap {
@@ -664,25 +675,28 @@ export default function BillsPage() {
       gap: 16px;
       align-items: flex-start;
     }
-    .notes { flex: 1; font-size: 11px; color: #445248; }
-    .totals { width: 260px; margin: 0; }
-    .totals td { border: 1px solid #d5e0d8; }
+    .notes { flex: 1; font-size: 12.5px; color: #334155; }
+    .totals { width: 300px; margin: 0; font-size: 13.5px; }
+    .totals td { border: 1px solid #94a3b8; padding: 7px 10px; }
     .totals .grand td {
-      background: #e8f2eb;
-      font-weight: 700;
-      font-size: 13px;
+      background: #e8efe9;
+      font-weight: 800;
+      font-size: 14.5px;
+      color: #143521;
     }
     .foot {
       display: flex;
       justify-content: space-between;
       margin-top: 28px;
       padding-top: 10px;
-      border-top: 1px dashed #c5d0c8;
-      color: #5c6b60;
-      font-size: 11px;
+      border-top: 1px dashed #94a3b8;
+      color: #475569;
+      font-size: 12.5px;
+      font-weight: 500;
     }
     @media print {
       body { padding: 0; }
+      @page { margin: 10mm; size: auto; }
       .invoice {
         border: none;
         padding: 0;
@@ -697,7 +711,20 @@ export default function BillsPage() {
 </body>
 </html>`;
 
+    return html;
+  };
+
+  const handlePrintHistory = () => {
+    const html = buildHistoryPrintHtml();
+    if (!html) return;
     printHtml(html);
+  };
+
+  const handlePreviewHistory = () => {
+    const html = buildHistoryPrintHtml();
+    if (!html) return;
+    setPreviewHtml(html);
+    setPreviewModalOpen(true);
   };
 
   const columns = [
@@ -785,6 +812,14 @@ export default function BillsPage() {
                     <p className="text-sm text-muted">{queryResult.lines.length} purchase records</p>
                     <div className="flex items-center gap-3">
                       <p className="text-lg font-semibold">Total: ₹{queryResult.totalAmount.toLocaleString()}</p>
+                      <Button
+                        variant="secondary"
+                        onClick={handlePreviewHistory}
+                        disabled={!queryResult.lines.length}
+                        className="flex items-center gap-1.5 border-2 border-forest-600 text-forest-800 font-bold"
+                      >
+                        <Eye className="w-4 h-4 text-forest-600" /> Print Preview
+                      </Button>
                       <Button variant="secondary" onClick={handlePrintHistory} disabled={!queryResult.lines.length}>
                         <Printer className="w-4 h-4" /> Print
                       </Button>
@@ -1078,6 +1113,14 @@ export default function BillsPage() {
           <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
         </div>
       </Modal>
+
+      <PrintPreviewModal
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        title="Purchase Invoices Statement"
+        subtitle={`${queryResult?.lines?.length ?? 0} purchase record(s)`}
+        html={previewHtml}
+      />
     </Layout>
   );
 }
