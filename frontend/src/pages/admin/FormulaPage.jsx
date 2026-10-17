@@ -1006,7 +1006,7 @@ export default function FormulaPage() {
       <tr>
         <th class="c" style="width: 40px;">#</th>
         <th style="width: 120px;">Herb Code</th>
-        <th>Herb Name</th>
+        <th>Element</th>
         <th class="r" style="width: 150px;">Quantity</th>
       </tr>
     </thead>

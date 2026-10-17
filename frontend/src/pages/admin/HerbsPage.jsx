@@ -259,7 +259,7 @@ export default function HerbsPage() {
       <tr>
         <th class="c" style="width: 40px;">#</th>
         <th style="width: 100px;">Code</th>
-        <th>Herb Name</th>
+        <th>Element</th>
         <th style="width: 70px;">Store</th>
         <th style="width: 110px;">Storage Type</th>
         <th class="r" style="width: 100px;">Total Stock</th>
@@ -333,7 +333,7 @@ export default function HerbsPage() {
 
     const missing = [];
     if (!String(form.herbCodeId || '').trim()) missing.push('Herb Code');
-    if (!String(form.name || '').trim()) missing.push('Herb Name');
+    if (!String(form.name || '').trim()) missing.push('Element');
     if (!String(form.unitOfMeasure || '').trim()) missing.push('Unit');
     if (!stockValue) missing.push('Total Stock');
     if (!alertValue) missing.push('Minimum Stock/Alert');
@@ -408,7 +408,7 @@ export default function HerbsPage() {
 
   const columns = [
     { key: 'herbCode', label: 'Code', render: r => r.herbCode || '—' },
-    { key: 'name', label: 'Herb Name' },
+    { key: 'name', label: 'Element' },
     { key: 'storeNumber', label: 'Store', render: r => r.storeNumber || '—' },
     { key: 'kanasterBora', label: 'Type', render: r => r.kanasterBora || '—' },
     { key: 'kanasterBoraNumber', label: 'Type No.', render: r => r.kanasterBoraNumber || '—' },
@@ -453,7 +453,7 @@ export default function HerbsPage() {
         <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <CardBody className="flex-1 min-h-0 flex flex-col overflow-hidden !py-4">
             <div className="mb-3 max-w-sm shrink-0">
-              <SearchBar value={search} onChange={setSearch} placeholder="Search by herb name or code..." />
+              <SearchBar value={search} onChange={setSearch} placeholder="Search by element or code..." />
             </div>
             <div className="flex-1 min-h-0 overflow-auto overscroll-contain panel-scroll border border-line rounded-lg">
               {loading ? <LoadingSpinner /> : <Table columns={columns} data={sortedItems} showNumber />}
@@ -500,7 +500,7 @@ export default function HerbsPage() {
             />
           </div>
           <Input
-            label="Herb Name"
+            label="Element"
             value={form.name}
             onChange={e => updateForm({ name: e.target.value.toUpperCase() })}
           />

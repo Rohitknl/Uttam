@@ -58,7 +58,7 @@ export const medicineCodeDeleteSchema = z.object({
 });
 
 export const herbSchema = z.object({
-  name: z.string().min(1, 'Herb name is required'),
+  name: z.string().min(1, 'Element is required'),
   herbCodeId: z.number().int({ message: 'Herb code is required' }),
   supplierName: z.string().optional().nullable(),
   supplierContact: z.string().optional().nullable(),
