@@ -8,8 +8,8 @@ import { printHtml } from '../../utils/print';
 const TILES = {
   lowHerbs: {
     key: 'lowHerbs',
-    label: 'Low Stock Herbs',
-    empty: 'All herbs are above minimum stock levels.',
+    label: 'Low Stock Elements',
+    empty: 'All elements are above minimum stock levels.',
     color: 'text-red-500',
     icon: AlertTriangle,
   },
@@ -71,7 +71,7 @@ function buildDashboardPrintHtml(title, rowsHtml) {
 function buildPrintRows(type, items) {
   if (type === 'lowHerbs') {
     return {
-      head: '<tr><th>#</th><th>Herb</th><th class="r">Stock</th><th class="r">Min Alert</th><th>Unit</th></tr>',
+      head: '<tr><th>#</th><th>Element</th><th class="r">Stock</th><th class="r">Min Alert</th><th>Unit</th></tr>',
       body: items.map((h, i) => `
         <tr>
           <td>${i + 1}</td>
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
           <CardHeader title={
             <span className={`flex items-center gap-2 ${lists.lowHerbs.length > 0 ? 'text-red-700 font-bold' : ''}`}>
               {lists.lowHerbs.length > 0 && <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />}
-              Low Stock Herbs
+              Low Stock Elements
             </span>
           } />
           <CardBody className="p-0">
@@ -284,7 +284,7 @@ export default function AdminDashboard() {
               <thead>
                 <tr className="border-b border-line bg-surface/50">
                   <th className="px-3 py-2 text-left font-medium text-muted">#</th>
-                  <th className="px-3 py-2 text-left font-medium text-muted">Herb</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted">Element</th>
                   <th className="px-3 py-2 text-right font-medium text-muted">Stock</th>
                   <th className="px-3 py-2 text-right font-medium text-muted">Min Alert</th>
                   <th className="px-3 py-2 text-left font-medium text-muted">Unit</th>

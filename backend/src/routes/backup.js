@@ -8,7 +8,7 @@ const router = Router();
 router.use(authenticate, requireAdmin);
 
 router.get('/destinations', asyncHandler(async (_req, res) => {
-  res.json(backupService.getBackupDestinations());
+  res.json(await backupService.getBackupDestinations());
 }));
 
 router.get('/list', asyncHandler(async (req, res) => {
@@ -17,7 +17,7 @@ router.get('/list', asyncHandler(async (req, res) => {
   if (!destinationId) {
     return res.status(400).json({ message: 'destinationId query param is required' });
   }
-  res.json(backupService.listBackups(destinationId));
+  res.json(await backupService.listBackups(destinationId));
 }));
 
 router.post('/create', requireHerbCodeCrudPassword, asyncHandler(async (req, res) => {

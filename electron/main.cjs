@@ -61,9 +61,12 @@ function getFrontendDist() {
   return path.join(__dirname, '..', 'frontend', 'dist');
 }
 
+let _dataDirCache = null;
 function getDataDir() {
+  if (_dataDirCache) return _dataDirCache;
   const dir = path.join(app.getPath('userData'), 'data');
   fs.mkdirSync(dir, { recursive: true });
+  _dataDirCache = dir;
   return dir;
 }
 
@@ -197,11 +200,28 @@ function ensureDatabase() {
   return dbPath;
 }
 
-function log(...args) {
+let _logBuffer = [];
+let _logFlushTimer = null;
+
+function flushLogs() {
+  if (_logBuffer.length === 0) return;
+  const batch = _logBuffer.join('');
+  _logBuffer = [];
   try {
     const logFile = path.join(getDataDir(), 'app.log');
-    fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${args.join(' ')}\n`);
+    fs.appendFile(logFile, batch, () => {});
   } catch {}
+}
+
+function log(...args) {
+  const line = `[${new Date().toISOString()}] ${args.join(' ')}\n`;
+  _logBuffer.push(line);
+  if (!_logFlushTimer) {
+    _logFlushTimer = setTimeout(() => {
+      _logFlushTimer = null;
+      flushLogs();
+    }, 400);
+  }
   console.log(...args);
 }
 
@@ -293,6 +313,9 @@ function startBackend() {
   backendProcess.stderr.on('data', (buf) => {
     const msg = buf.toString().trim();
     stderrOutput += msg + '\n';
+    if (stderrOutput.length > 8000) {
+      stderrOutput = stderrOutput.slice(-8000);
+    }
     log(`[api:err] ${msg}`);
   });
   backendProcess.on('exit', (code, signal) => {
@@ -402,11 +425,13 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     isQuitting = true;
+    flushLogs();
     stopBackend();
   });
 
   app.on('window-all-closed', () => {
     isQuitting = true;
+    flushLogs();
     stopBackend();
     app.quit();
   });

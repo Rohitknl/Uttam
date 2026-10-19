@@ -203,7 +203,12 @@ export default function BillsPage() {
     billsApi.getAll(search || undefined).then(setBills).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load();
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const handleQuery = async () => {
     setQueryLoading(true);
@@ -216,7 +221,7 @@ export default function BillsPage() {
   };
 
   const historyColumns = [
-    { key: 'herbName', label: 'Herb' },
+    { key: 'herbName', label: 'Element' },
     { key: 'herbCode', label: 'Code', render: r => r.herbCode || '—' },
     { key: 'quantity', label: 'Quantity' },
     { key: 'rate', label: 'Rate', render: r => `₹${r.rate}` },
@@ -313,7 +318,7 @@ export default function BillsPage() {
     const rate = parsePositiveNumber(rateRaw);
 
     const lineMissing = [];
-    if (!lineForm.herbCodeId) lineMissing.push('Herb Code');
+    if (!lineForm.herbCodeId) lineMissing.push('Element Code');
     if (!String(lineForm.herbName || '').trim()) lineMissing.push('Goods Name');
     if (!(quantity > 0)) lineMissing.push('Quantity');
     if (rateRaw === '' || Number.isNaN(rate)) lineMissing.push('Per Rate');
@@ -323,7 +328,7 @@ export default function BillsPage() {
     }
     const code = availableCodes.find(c => c.id === parseInt(lineForm.herbCodeId, 10));
     if (!code) {
-      setMissingFields(['Herb Code']);
+      setMissingFields(['Element Code']);
       return;
     }
     const line = {
@@ -491,7 +496,7 @@ export default function BillsPage() {
           <thead>
             <tr>
               <th class="c" style="width:40px">#</th>
-              <th>Herb Code</th>
+              <th>Element Code</th>
               <th>Goods Name</th>
               <th class="c">Per</th>
               <th class="r">Quantity</th>
@@ -546,7 +551,7 @@ export default function BillsPage() {
           <table>
             <thead>
               <tr>
-                <th>#</th><th>Herb</th><th>Code</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th><th>Supplier</th><th>Date</th>
+                <th>#</th><th>Element</th><th>Code</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th><th>Supplier</th><th>Date</th>
               </tr>
             </thead>
             <tbody>
@@ -974,15 +979,15 @@ export default function BillsPage() {
             <div className="grid grid-cols-6 gap-2 mb-3">
               <DropdownSelect
                 className="col-span-2"
-                label="Herb Code"
+                label="Element Code"
                 searchable
                 searchPlaceholder="Type code or name..."
-                placeholder="Select herb code"
+                placeholder="Select element code"
                 value={lineForm.herbCodeId}
                 onChange={selectHerbCodeId}
                 options={herbCodeOptions}
               />
-              <Input label="Goods Name" value={lineForm.herbName} readOnly placeholder="Select herb code" className="bg-surface/50" />
+              <Input label="Goods Name" value={lineForm.herbName} readOnly placeholder="Select element code" className="bg-surface/50" />
               <Select label="Per" value={lineForm.unit} onChange={e => setLineForm(prev => ({ ...prev, unit: e.target.value }))}>
                 {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </Select>
@@ -1024,7 +1029,7 @@ export default function BillsPage() {
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-line bg-surface/50">
-                      <th className="px-3 py-2 text-left font-medium text-muted">Herb Code</th>
+                      <th className="px-3 py-2 text-left font-medium text-muted">Element Code</th>
                       <th className="px-3 py-2 text-left font-medium text-muted">Goods Name</th>
                       <th className="px-3 py-2 text-left font-medium text-muted">Per</th>
                       <th className="px-3 py-2 text-right font-medium text-muted">Quantity</th>
@@ -1106,7 +1111,7 @@ export default function BillsPage() {
       <Modal open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setError(''); }} title="Delete Bill">
         {error && <Alert type="error" className="mb-4">{error}</Alert>}
         <p className="text-sm text-muted mb-4">
-          Delete invoice <span className="font-medium text-ink">{deleteTarget?.billNumber}</span>? Herb stock from this bill will be reversed.
+          Delete invoice <span className="font-medium text-ink">{deleteTarget?.billNumber}</span>? Element stock from this bill will be reversed.
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => { setDeleteTarget(null); setError(''); }}>Cancel</Button>

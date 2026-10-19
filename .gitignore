@@ -11,3 +11,4 @@ backend/prisma/*.db
 frontend/dist/
 release/
 backend/prisma/template.db
+*.log

@@ -143,12 +143,12 @@ export async function createBill(data) {
   const herbCodeIds = data.lines.map(l => l.herbCodeId);
   const uniqueIds = new Set(herbCodeIds);
   if (uniqueIds.size !== herbCodeIds.length) {
-    throw new AppError('Each herb code can only be used once per bill', 400);
+    throw new AppError('Each element code can only be used once per bill', 400);
   }
 
   for (const line of data.lines) {
     const herbCode = await prisma.herbCode.findUnique({ where: { id: line.herbCodeId } });
-    if (!herbCode) throw new AppError(`Herb code ${line.herbCodeId} not found`, 400);
+    if (!herbCode) throw new AppError(`Element code ${line.herbCodeId} not found`, 400);
     line.herbCode = line.herbCode || herbCode.code;
   }
 
@@ -222,7 +222,7 @@ async function syncHerbRateFromLatestBill(tx, herbId) {
 
 async function addBillLineToHerbStock(tx, billId, line, header) {
   const herbCode = await tx.herbCode.findUnique({ where: { id: line.herbCodeId } });
-  if (!herbCode) throw new AppError(`Herb code ${line.herbCodeId} not found`, 400);
+  if (!herbCode) throw new AppError(`Element code ${line.herbCodeId} not found`, 400);
 
   const amount = line.amount ?? toMoney(multiply(line.rate, line.quantity));
   let herb = await tx.herb.findFirst({ where: { herbCodeId: line.herbCodeId } });
@@ -290,7 +290,7 @@ async function deleteBillLineInTx(tx, billId, line) {
     if (herb) {
       const newStock = toNumber(subtract(herb.currentStock, line.quantity));
       if (newStock < 0) {
-        throw new AppError('Cannot remove line: herb stock would become negative', 400);
+        throw new AppError('Cannot remove line: element stock would become negative', 400);
       }
       await tx.herb.update({
         where: { id: line.herbId },
@@ -329,7 +329,7 @@ async function updateBillLineInTx(tx, billId, existingLine, line, header) {
     if (herb) {
       const newStock = toNumber(add(herb.currentStock, quantityDelta));
       if (newStock < 0) {
-        throw new AppError('Cannot update line: herb stock would become negative', 400);
+        throw new AppError('Cannot update line: element stock would become negative', 400);
       }
       await tx.herb.update({
         where: { id: existingLine.herbId },
@@ -366,7 +366,7 @@ export async function updateBill(id, data) {
 
   const herbCodeIds = data.lines.map(l => l.herbCodeId);
   if (new Set(herbCodeIds).size !== herbCodeIds.length) {
-    throw new AppError('Each herb code can only be used once per bill', 400);
+    throw new AppError('Each element code can only be used once per bill', 400);
   }
 
   const { taxType, taxPercent, igstPercent } = resolveTaxInput(data);
@@ -478,7 +478,7 @@ export async function updateBillLine(billId, lineId, data) {
       if (herb) {
         const newStock = toNumber(add(herb.currentStock, quantityDelta));
         if (newStock < 0) {
-          throw new AppError('Cannot update line: herb stock would become negative', 400);
+          throw new AppError('Cannot update line: element stock would become negative', 400);
         }
         await tx.herb.update({
           where: { id: line.herbId },

@@ -59,7 +59,7 @@ export const medicineCodeDeleteSchema = z.object({
 
 export const herbSchema = z.object({
   name: z.string().min(1, 'Element is required'),
-  herbCodeId: z.number().int({ message: 'Herb code is required' }),
+  herbCodeId: z.number().int({ message: 'Element code is required' }),
   supplierName: z.string().optional().nullable(),
   supplierContact: z.string().optional().nullable(),
   unitOfMeasure: z.enum(['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES']),
@@ -158,6 +158,7 @@ export const recipeItemSchema = z.object({
   herbId: z.number().int(),
   quantity: z.number().positive(),
   unit: z.enum(['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES']).optional().default('KG'),
+  firmName: z.string().optional().nullable(),
 });
 
 export const formulaValidateSchema = z.object({

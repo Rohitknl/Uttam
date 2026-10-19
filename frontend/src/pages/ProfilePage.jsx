@@ -68,9 +68,9 @@ export default function ProfilePage({ portal = 'admin' }) {
       });
       await refreshSecurity();
       setCrudForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setMessage(result.message || 'Edit/Delete Herb Password updated');
+      setMessage(result.message || 'Edit/Delete Element Password updated');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update Edit/Delete Herb Password');
+      setError(err.response?.data?.message || 'Failed to update Edit/Delete Element Password');
     } finally {
       setSaving(false);
     }
@@ -149,17 +149,17 @@ export default function ProfilePage({ portal = 'admin' }) {
               <CardBody>
                 <h3 className="font-display text-lg font-semibold mb-2">
                   {!securityLoaded
-                    ? 'Edit/Delete Herb Password'
-                    : (crudPasswordSet ? 'Reset Edit/Delete Herb Password' : 'Set Edit/Delete Herb Password')}
+                    ? 'Edit/Delete Element Password'
+                    : (crudPasswordSet ? 'Reset Edit/Delete Element Password' : 'Set Edit/Delete Element Password')}
                 </h3>
                 <p className="text-sm text-muted mb-4">
-                  Used when editing or deleting herb codes, medicine codes, herbs, and medicines.
+                  Used when editing or deleting element codes, medicine codes, elements, and medicines.
                 </p>
 
                 <form onSubmit={saveCrudPassword} className="grid gap-3 md:grid-cols-3">
                   {securityLoaded && crudPasswordSet && (
                     <Input
-                      label="Current Edit/Delete Herb Password"
+                      label="Current Edit/Delete Element Password"
                       type="password"
                       value={crudForm.currentPassword}
                       onChange={e => setCrudForm({ ...crudForm, currentPassword: e.target.value })}
@@ -167,7 +167,7 @@ export default function ProfilePage({ portal = 'admin' }) {
                     />
                   )}
                   <Input
-                    label="New Edit/Delete Herb Password"
+                    label="New Edit/Delete Element Password"
                     type="password"
                     value={crudForm.newPassword}
                     onChange={e => setCrudForm({ ...crudForm, newPassword: e.target.value })}
@@ -184,7 +184,7 @@ export default function ProfilePage({ portal = 'admin' }) {
                     <Button type="submit" disabled={saving || !securityLoaded}>
                       {saving
                         ? 'Saving...'
-                        : (crudPasswordSet ? 'Reset Edit/Delete Herb Password' : 'Set Edit/Delete Herb Password')}
+                        : (crudPasswordSet ? 'Reset Edit/Delete Element Password' : 'Set Edit/Delete Element Password')}
                     </Button>
                   </div>
                 </form>
@@ -199,7 +199,7 @@ export default function ProfilePage({ portal = 'admin' }) {
                     : (formulaPasswordSet ? 'Reset Formula Password' : 'Set Formula Password')}
                 </h3>
                 <p className="text-sm text-muted mb-4">
-                  Dedicated password used for formula operations (viewing, editing, deleting, and printing formulas). Separate from Edit/Delete Herb Password.
+                  Dedicated password used for formula operations (viewing, editing, deleting, and printing formulas). Separate from Edit/Delete Element Password.
                 </p>
 
                 <form onSubmit={saveFormulaPassword} className="grid gap-3 md:grid-cols-3">

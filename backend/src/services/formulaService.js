@@ -1,7 +1,7 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { toNumber, multiply, subtract, divide } from '../utils/decimal.js';
-import { getRecipeWithHerbs } from './recipeService.js';
+import { getRecipeWithHerbs, unpackDescription } from './recipeService.js';
 
 const UNIT_FAMILY = {
   KG: 'mass',
@@ -65,9 +65,16 @@ function buildRequirement(ri, scale) {
   const shortageInRecipeUnit = Math.max(0, toNumber(subtract(scaledInRecipeUnit, availableInRecipeUnit)));
   const sufficient = availableStock + 1e-9 >= requiredInStockUnit;
 
+  const costPerUnit = toNumber(ri.herb?.costPerUnit ?? 0);
+  const costOfRequiredQuantity = toNumber(multiply(requiredInStockUnit, costPerUnit));
+
   return {
     herbId: ri.herbId,
+    herbCodeId: ri.herb?.herbCodeId || null,
+    herbCode: ri.herb?.herbCode?.code || null,
     herbName: ri.herb.name,
+    costPerUnit,
+    costOfRequiredQuantity,
     unitOfMeasure: recipeUnit,
     stockUnit,
     quantityPerUnit,
@@ -105,7 +112,7 @@ export async function validateFormula(medicineCodeId, batchSize) {
     formulaUnit: code.formulaUnit || 'PIECES',
     message: valid
       ? 'Stock sufficient'
-      : `Insufficient herb stock: ${items.filter(i => !i.sufficient).map(s => (
+      : `Insufficient element stock: ${items.filter(i => !i.sufficient).map(s => (
         `${s.herbName} (need ${s.scaledQuantity} ${s.unitOfMeasure}, have ${s.availableInRecipeUnit} ${s.unitOfMeasure} / ${s.availableStock} ${s.stockUnit})`
       )).join('; ')}`,
   };
@@ -124,18 +131,20 @@ export async function generateFormula(medicineCodeId, batchSize) {
   const shortages = items.filter(i => !i.sufficient);
   const sufficient = shortages.length === 0;
 
+  const unpacked = unpackDescription(code.description);
   return {
     medicineCodeId: code.id,
     medicineName: code.name,
     medicineCode: code.code,
-    description: code.description || '',
+    firmName: unpacked.firmName,
+    description: unpacked.description,
     formulaQuantity: baseQty,
     formulaUnit: code.formulaUnit || 'PIECES',
     batchSize: toNumber(batchSize),
     sufficient,
     message: sufficient
       ? 'Stock sufficient'
-      : `Insufficient herb stock: ${shortages.map(s => (
+      : `Insufficient element stock: ${shortages.map(s => (
         `${s.herbName} (need ${s.scaledQuantity} ${s.unitOfMeasure}, available ${s.availableInRecipeUnit} ${s.unitOfMeasure})`
       )).join('; ')}`,
     items,

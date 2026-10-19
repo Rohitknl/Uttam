@@ -58,7 +58,7 @@ export default function PasswordSetupPage() {
       setCrudForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setMessage(result.message || 'Edit/delete password saved');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save Edit/Delete Herb Password');
+      setError(err.response?.data?.message || 'Failed to save Edit/Delete Element Password');
     } finally {
       setSaving(false);
     }
@@ -113,27 +113,27 @@ export default function PasswordSetupPage() {
 
         {needsCrudPasswordSetup && (
           <div className="bg-white rounded-xl border border-line shadow-sm p-6">
-            <h2 className="font-display text-lg font-semibold mb-2">Set Edit/Delete Herb Password</h2>
+            <h2 className="font-display text-lg font-semibold mb-2">Set Edit/Delete Element Password</h2>
             <p className="text-sm text-muted mb-4">
-              This password is required when editing or deleting herb codes, medicine codes, herbs, and medicines.
+              This password is required when editing or deleting element codes, medicine codes, elements, and medicines.
             </p>
             <form onSubmit={handleCrudPassword} className="space-y-3">
               <Input
-                label="New Edit/Delete Herb Password"
+                label="New Edit/Delete Element Password"
                 type="password"
                 value={crudForm.newPassword}
                 onChange={e => setCrudForm({ ...crudForm, newPassword: e.target.value })}
                 required
               />
               <Input
-                label="Confirm Edit/Delete Herb Password"
+                label="Confirm Edit/Delete Element Password"
                 type="password"
                 value={crudForm.confirmPassword}
                 onChange={e => setCrudForm({ ...crudForm, confirmPassword: e.target.value })}
                 required
               />
               <Button type="submit" className="w-full justify-center" disabled={saving}>
-                Save Edit/Delete Herb Password
+                Save Edit/Delete Element Password
               </Button>
             </form>
           </div>

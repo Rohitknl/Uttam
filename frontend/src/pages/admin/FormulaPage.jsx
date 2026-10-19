@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle, Lock, Unlock, Key } from 'lucide-react';
 import Layout from '../../components/Layout';
@@ -49,6 +49,28 @@ function toBatchSize(quantity, fromUnit, toUnit) {
     return round4(fromBase(toBase(qty, fromUnit), toUnit));
   }
   return qty;
+}
+
+function getItemRateAndAmount(item, herb) {
+  const rate = parseFloat(herb?.costPerUnit ?? item?.costPerUnit ?? 0) || 0;
+  const stockUnit = herb?.unitOfMeasure || item?.stockUnit || item?.unit || 'KG';
+  const qty = parseFloat(item.scaledQuantity ?? item.quantity ?? 0) || 0;
+  const unit = item.unitOfMeasure || item.unit || stockUnit;
+
+  let qtyInStockUnit = qty;
+  if (UNIT_FAMILY[unit] && UNIT_FAMILY[stockUnit] && UNIT_FAMILY[unit] === UNIT_FAMILY[stockUnit]) {
+    qtyInStockUnit = fromBase(toBase(qty, unit), stockUnit);
+  }
+  const amount = Math.round(qtyInStockUnit * rate * 100) / 100;
+
+  return {
+    rate,
+    stockUnit,
+    rateLabel: rate > 0 ? `₹${rate.toFixed(2)} / ${stockUnit}` : '—',
+    amount,
+    amountLabel: amount > 0 ? `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—',
+    qtyInStockUnit,
+  };
 }
 
 function isDecimalInput(value) {
@@ -313,6 +335,7 @@ export default function FormulaPage() {
       medicineCodeId: c.id,
       code: c.code,
       name: c.name,
+      firmName: c.firmName || '',
       description: c.description || '',
       formulaQuantity: c.formulaQuantity ?? 1,
       formulaUnit: c.formulaUnit || 'PIECES',
@@ -333,6 +356,8 @@ export default function FormulaPage() {
         name: c.name || herb?.name || '',
         unit: herb?.unitOfMeasure || 'KG',
         stock: herb?.currentStock ?? 0,
+        costPerUnit: herb?.costPerUnit ?? 0,
+        firmName: herb?.supplierName || '',
       };
     });
     const extra = (herbList || [])
@@ -344,6 +369,8 @@ export default function FormulaPage() {
         name: h.name,
         unit: h.unitOfMeasure || 'KG',
         stock: h.currentStock ?? 0,
+        costPerUnit: h.costPerUnit ?? 0,
+        firmName: h.supplierName || '',
       }));
     return [...fromCodes, ...extra].sort((a, b) => String(a.code).localeCompare(String(b.code)));
   };
@@ -376,6 +403,7 @@ export default function FormulaPage() {
     if (!selectedMedicineCodeId) {
       setFormulaQuantity('1');
       setFormulaUnit('PIECES');
+      setFirmName('');
       setDescription('');
       setRecipe([]);
       setHasRecipe(false);
@@ -390,10 +418,12 @@ export default function FormulaPage() {
     medicineCodesApi.getRecipe(selectedMedicineCodeId)
       .then(data => {
         const items = data.items || [];
+        const opt = medicineOptionsRef.current.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
         setHasRecipe(items.length > 0);
         setFormulaQuantity(String(data.formulaQuantity ?? 1));
         const unit = data.formulaUnit || 'PIECES';
         setFormulaUnit(unit);
+        setFirmName(data.firmName || opt?.firmName || '');
         setDescription(data.description || '');
         setBaseFormulaQuantity(data.formulaQuantity ?? 1);
         setBaseFormulaUnit(unit);
@@ -401,13 +431,15 @@ export default function FormulaPage() {
         setGenerateQuantity(String(data.formulaQuantity ?? 1));
         setRecipe(items.map((r, i) => {
           const herb = herbsRef.current.find(h => h.id === r.herbId);
-          const opt = herbOptionsRef.current.find(o => o.herbId === r.herbId)
+          const optHerb = herbOptionsRef.current.find(o => o.herbId === r.herbId)
             || herbOptionsRef.current.find(o => o.herbCodeId === herb?.herbCodeId);
           return {
             _key: r.id ? `server-${r.id}` : `recipe-${i}-${Date.now()}`,
             herbId: String(r.herbId),
-            herbCodeId: opt ? String(opt.herbCodeId) : (herb?.herbCodeId ? String(herb.herbCodeId) : ''),
-            herbName: r.herbName || herb?.name || opt?.name || '',
+            herbCodeId: optHerb ? String(optHerb.herbCodeId) : (herb?.herbCodeId ? String(herb.herbCodeId) : ''),
+            herbCode: r.herbCode || optHerb?.code || herb?.herbCode || '—',
+            herbName: r.herbName || herb?.name || optHerb?.name || '',
+            costPerUnit: r.costPerUnit ?? herb?.costPerUnit ?? optHerb?.costPerUnit ?? 0,
             quantity: String(r.quantity ?? ''),
             unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
           };
@@ -419,6 +451,7 @@ export default function FormulaPage() {
         setFormulaQuantity('1');
         const unit = opt?.formulaUnit || 'PIECES';
         setFormulaUnit(unit);
+        setFirmName(opt?.firmName || '');
         setDescription(opt?.description || '');
         setBaseFormulaQuantity(1);
         setBaseFormulaUnit(unit);
@@ -458,12 +491,15 @@ export default function FormulaPage() {
       const qty = generateQuantity || String(baseFormulaQuantity || 1);
       const batchSize = toBatchSize(qty, generateUnit, baseFormulaUnit);
       if (batchSize > 0) {
-        formulasApi.generate({
-          medicineCodeId: parseInt(selectedMedicineCodeId, 10),
-          batchSize,
-        })
-          .then(res => setGenerated(res))
-          .catch(() => setGenerated(null));
+        const timer = setTimeout(() => {
+          formulasApi.generate({
+            medicineCodeId: parseInt(selectedMedicineCodeId, 10),
+            batchSize,
+          })
+            .then(res => setGenerated(res))
+            .catch(() => setGenerated(null));
+        }, 350);
+        return () => clearTimeout(timer);
       }
     }
   }, [activeTab, selectedMedicineCodeId, hasRecipe, generateQuantity, generateUnit, baseFormulaQuantity, baseFormulaUnit]);
@@ -481,7 +517,9 @@ export default function FormulaPage() {
         _key: `new-${Date.now()}-${Math.random()}`,
         herbId: '',
         herbCodeId: '',
+        herbCode: '',
         herbName: '',
+        costPerUnit: 0,
         quantity: '',
         unit: '',
       },
@@ -514,7 +552,7 @@ export default function FormulaPage() {
       setRecipe(prev => {
         const updated = [...prev];
         if (updated[idx]) {
-          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbName: '', unit: '', quantity: '' };
+          updated[idx] = { ...updated[idx], herbCodeId: '', herbId: '', herbCode: '', herbName: '', costPerUnit: 0, unit: '', quantity: '' };
         }
         return updated;
       });
@@ -522,7 +560,7 @@ export default function FormulaPage() {
     }
     const alreadyUsed = recipe.some((r, i) => i !== idx && String(r.herbCodeId) === String(herbCodeId));
     if (alreadyUsed) {
-      setMessage('This herb is already in the formula. Each herb can be added only once.');
+      setMessage('This element is already in the formula. Each element can be added only once.');
       return;
     }
     const opt = herbOptions.find(o => String(o.herbCodeId) === String(herbCodeId));
@@ -545,8 +583,11 @@ export default function FormulaPage() {
                 return {
                   ...o,
                   herbId: createdHerb.id,
+                  code: opt.code,
                   unit: createdHerb.unitOfMeasure || o.unit,
                   stock: createdHerb.currentStock ?? 0,
+                  costPerUnit: createdHerb.costPerUnit ?? 0,
+                  firmName: createdHerb.supplierName || o.firmName || '',
                 };
               }
               return o;
@@ -559,14 +600,14 @@ export default function FormulaPage() {
     }
 
     if (!herb) {
-      const err = `Herb "${opt?.name || 'Selected herb'}" does not exist in Store. Please add it on the Herbs page.`;
+      const err = `Element "${opt?.name || 'Selected element'}" does not exist in Store. Please add it on the Elements page.`;
       setMessage(err);
       return;
     }
 
     const herbAlreadyUsed = recipe.some((r, i) => i !== idx && String(r.herbId) === String(herb.id));
     if (herbAlreadyUsed) {
-      setMessage(`Herb "${herb.name}" is already in the formula. Each herb can be added only once.`);
+      setMessage(`Element "${herb.name}" is already in the formula. Each element can be added only once.`);
       return;
     }
 
@@ -577,7 +618,9 @@ export default function FormulaPage() {
         ...updated[idx],
         herbCodeId: String(herbCodeId),
         herbId: String(herb.id),
+        herbCode: opt?.code || herb.herbCode || '—',
         herbName: herb.name || opt?.name || '',
+        costPerUnit: herb.costPerUnit ?? opt?.costPerUnit ?? 0,
         unit: normalizeHerbUnit(herb, opt?.unit),
       };
       return updated;
@@ -628,7 +671,7 @@ export default function FormulaPage() {
       return;
     }
     if (!summed.items.length) {
-      setMessage('Add at least one herb with quantity before saving the formula');
+      setMessage('Add at least one element with quantity before saving the formula');
       return;
     }
 
@@ -638,13 +681,13 @@ export default function FormulaPage() {
 
     if (herbTotal + 1e-9 < medQty) {
       setMessage(
-        `Herb total (${herbLabel}) is less than medicine quantity (${medLabel}). Add herbs equal to ${medLabel}.`,
+        `Element total (${herbLabel}) is less than medicine quantity (${medLabel}). Add elements equal to ${medLabel}.`,
       );
       return;
     }
     if (herbTotal > medQty + 1e-9) {
       setMessage(
-        `Herb total (${herbLabel}) is more than medicine quantity (${medLabel}). Herb total must equal ${medLabel}.`,
+        `Element total (${herbLabel}) is more than medicine quantity (${medLabel}). Element total must equal ${medLabel}.`,
       );
       return;
     }
@@ -658,7 +701,7 @@ export default function FormulaPage() {
         const herbId = parseInt(r.herbId, 10);
         if (seen.has(herbId)) {
           const herb = herbs.find(h => h.id === herbId);
-          setMessage(`Herb "${herb?.name || herbId}" is added more than once. Each herb can appear only once.`);
+          setMessage(`Element "${herb?.name || herbId}" is added more than once. Each element can appear only once.`);
           setSaving(false);
           return;
         }
@@ -673,14 +716,14 @@ export default function FormulaPage() {
           }
         }
         if (!herb) {
-          const err = `Herb "${r.herbName || herbId}" does not exist in Store. Please add it on the Herbs page.`;
+          const err = `Element "${r.herbName || herbId}" does not exist in Store. Please add it on the Elements page.`;
           setMessage(err);
           setSaving(false);
           return;
         }
         const unit = normalizeHerbUnit(herb, r.unit);
         if (UNIT_FAMILY[unit] !== UNIT_FAMILY[herb.unitOfMeasure || 'KG']) {
-          setMessage(`Unit for ${herb.name} must be ${unitsForHerb(herb).join(' or ')} (same as Herbs page)`);
+          setMessage(`Unit for ${herb.name} must be ${unitsForHerb(herb).join(' or ')} (same as Elements page)`);
           setSaving(false);
           return;
         }
@@ -696,6 +739,7 @@ export default function FormulaPage() {
         formulaQuantity: medQty,
         formulaUnit,
         description: description ? description.trim() : '',
+        firmName: firmName ? firmName.trim() : '',
         items,
       });
       setHasRecipe(true);
@@ -703,6 +747,7 @@ export default function FormulaPage() {
         String(m.medicineCodeId) === String(selectedMedicineCodeId)
           ? {
               ...m,
+              firmName: firmName ? firmName.trim() : '',
               description: description ? description.trim() : '',
               formulaQuantity: medQty,
               formulaUnit,
@@ -762,7 +807,7 @@ export default function FormulaPage() {
       const result = await formulasApi.generate(payload);
       setGenerated(result);
       if (!result.sufficient) {
-        setMessage(result.message || 'Insufficient herb stock to generate this formula');
+        setMessage(result.message || 'Insufficient element stock to generate this formula');
       }
     } catch (err) {
       setMessage(err.response?.data?.message || 'Generate failed');
@@ -785,15 +830,28 @@ export default function FormulaPage() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
-    const rows = generated.items.map((r, i) => `
+    let totalRequiredQty = 0;
+    let totalRequiredAmount = 0;
+
+    const rows = generated.items.map((r, i) => {
+      const herb = herbs.find(h => h.id === parseInt(r.herbId, 10));
+      const opt = herbOptions.find(o => o.herbId === r.herbId || (r.herbCodeId && String(o.herbCodeId) === String(r.herbCodeId)));
+      const elCode = r.herbCode || opt?.code || herb?.herbCode || '—';
+      const rateInfo = getItemRateAndAmount(r, herb);
+      totalRequiredQty += parseFloat(r.scaledQuantity) || 0;
+      totalRequiredAmount += rateInfo.amount || 0;
+
+      return `
       <tr>
         <td class="c">${i + 1}</td>
-        <td>${esc(r.herbName)}</td>
-        <td class="r">${esc(r.quantityPerUnit)} ${esc(r.unitOfMeasure || '')}</td>
-        <td class="r">${esc(r.scaledQuantity)} ${esc(r.unitOfMeasure || '')}</td>
+        <td class="code">${esc(elCode)}</td>
+        <td class="bold">${esc(r.herbName)}</td>
+        <td class="r bold">${esc(r.scaledQuantity)} ${esc(r.unitOfMeasure || '')}</td>
+        <td class="r">${esc(rateInfo.rateLabel)}</td>
+        <td class="r bold">${esc(rateInfo.amountLabel)}</td>
         <td class="r">${esc(r.availableInRecipeUnit ?? r.availableStock)} ${esc(r.unitOfMeasure || '')}</td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
 
     return `<!DOCTYPE html>
 <html>
@@ -813,6 +871,11 @@ export default function FormulaPage() {
     th { background: #e8efe9; color: #143521; text-align: left; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
     td { font-size: 13.5px; color: #0f172a; }
     .c { text-align: center; } .r { text-align: right; }
+    .code { font-family: monospace; font-weight: 700; font-size: 13.5px; color: #143521; }
+    .bold { font-weight: 700; font-size: 13.5px; color: #0f172a; }
+    .desc-box { margin-top: 18px; padding: 12px 14px; background: #f8faf8; border: 1px solid #94a3b8; border-radius: 6px; }
+    .desc-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #1e3a2b; margin-bottom: 5px; }
+    .desc-content { font-size: 13.5px; color: #0f172a; white-space: pre-wrap; line-height: 1.5; }
     .foot { margin-top: 24px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; }
     @media print { body { padding: 0; } @page { margin: 10mm; size: auto; } }
   </style>
@@ -826,7 +889,6 @@ export default function FormulaPage() {
     <div><span>Batch Number</span><strong>${esc(displayBatch || '—')}</strong></div>
     <div><span>Medicine Code</span><strong>${esc(code)}</strong></div>
     <div><span>Medicine</span><strong>${esc(name)}</strong></div>
-    ${displayDescription ? `<div style="grid-column: span 2;"><span>Description</span><strong>${esc(displayDescription)}</strong></div>` : ''}
     <div><span>Base Formula</span><strong>${esc(generated.formulaQuantity)} ${esc(generated.formulaUnit)}</strong></div>
     <div><span>Generate Qty</span><strong>${esc(generateQuantity)} ${esc(generateUnit)}${generateUnit !== generated.formulaUnit ? ` (${esc(generated.batchSize)} ${esc(generated.formulaUnit)})` : ''}</strong></div>
     <div><span>Date</span><strong>${new Date().toLocaleDateString('en-IN')}</strong></div>
@@ -834,15 +896,31 @@ export default function FormulaPage() {
   <table>
     <thead>
       <tr>
-        <th class="c">#</th>
-        <th>Herb</th>
-        <th class="r">Qty / Base</th>
-        <th class="r">Required</th>
-        <th class="r">Available</th>
+        <th class="c" style="width: 35px;">#</th>
+        <th style="width: 130px;">Element Code</th>
+        <th>Element</th>
+        <th class="r" style="width: 140px;">Required Qty</th>
+        <th class="r" style="width: 130px;">Rate / Unit</th>
+        <th class="r" style="width: 140px;">Amount</th>
+        <th class="r" style="width: 120px;">Available Stock</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
+    <tfoot>
+      <tr style="background: #e8efe9; font-weight: 700; border-top: 2px solid #1e3a2b;">
+        <td colspan="3" class="bold" style="text-align: right; text-transform: uppercase;">Total Required:</td>
+        <td class="r bold" style="font-size: 14px; color: #143521;">${round4(totalRequiredQty)} ${esc(generateUnit || generated.formulaUnit || '')}</td>
+        <td class="r bold" style="text-align: right; text-transform: uppercase;">Total Amount:</td>
+        <td class="r bold" style="font-size: 14px; color: #143521;">₹${totalRequiredAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td></td>
+      </tr>
+    </tfoot>
   </table>
+  ${displayDescription ? `
+  <div class="desc-box">
+    <div class="desc-title">Description / Batch Notes</div>
+    <div class="desc-content">${esc(displayDescription)}</div>
+  </div>` : ''}
   <div class="foot">Computer-generated formula sheet — ${esc(displayFirm)}</div>
 </body>
 </html>`;
@@ -882,7 +960,7 @@ export default function FormulaPage() {
         const rem = r.remainingStock < 0 ? ` (Remaining: ${r.remainingStock} ${r.stockUnit})` : '';
         return `${r.herbName}: -${r.consumed} ${r.unitOfMeasure || ''}${rem}`;
       }).join(', ');
-      setMessage(`Consumed herbs: ${summary}`);
+      setMessage(`Consumed elements: ${summary}`);
       if (generated) {
         const refreshed = await formulasApi.generate({ medicineCodeId, batchSize });
         setGenerated(refreshed);
@@ -904,6 +982,7 @@ export default function FormulaPage() {
     let baseQty = med?.formulaQuantity ?? 1;
     let baseUnit = med?.formulaUnit || 'PIECES';
     let medDesc = med?.description || '';
+    let medFirm = (firmName || med?.firmName || '').trim() || 'Uttam Laboratories';
 
     if (String(targetId) === String(selectedMedicineCodeId) && recipe.length > 0) {
       recipeData = recipe.map(r => {
@@ -911,8 +990,9 @@ export default function FormulaPage() {
         const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId))
           || herbOptions.find(o => String(o.herbId) === String(r.herbId));
         return {
-          herbCode: opt?.code || herb?.herbCode || '—',
-          herbName: r.herbName || opt?.name || herb?.name || 'Herb',
+          herbId: r.herbId,
+          herbCode: r.herbCode || opt?.code || herb?.herbCode || '—',
+          herbName: r.herbName || opt?.name || herb?.name || 'Element',
           quantity: r.quantity,
           unit: r.unit,
         };
@@ -920,19 +1000,22 @@ export default function FormulaPage() {
       baseQty = formulaQuantity;
       baseUnit = formulaUnit;
       medDesc = description;
+      medFirm = (firmName || med?.firmName || '').trim() || 'Uttam Laboratories';
     } else {
       const data = await medicineCodesApi.getRecipe(targetId);
       const items = data.items || [];
       baseQty = data.formulaQuantity ?? med?.formulaQuantity ?? 1;
       baseUnit = data.formulaUnit || med?.formulaUnit || 'PIECES';
       medDesc = data.description || med?.description || '';
+      medFirm = (data.firmName || med?.firmName || '').trim() || 'Uttam Laboratories';
       recipeData = items.map(r => {
         const herb = herbs.find(h => h.id === r.herbId);
         const opt = herbOptions.find(o => o.herbId === r.herbId)
           || herbOptions.find(o => o.herbCodeId === herb?.herbCodeId);
         return {
-          herbCode: opt?.code || herb?.herbCode || '—',
-          herbName: r.herbName || herb?.name || opt?.name || 'Herb',
+          herbId: r.herbId,
+          herbCode: r.herbCode || opt?.code || herb?.herbCode || '—',
+          herbName: r.herbName || herb?.name || opt?.name || 'Element',
           quantity: r.quantity ?? '',
           unit: normalizeHerbUnit(herb || { unitOfMeasure: r.unit }, r.unit),
         };
@@ -953,14 +1036,25 @@ export default function FormulaPage() {
     const code = med?.code || '—';
     const name = med?.name || '—';
 
-    const rows = recipeData.map((r, i) => `
+    let totalFormulaQty = 0;
+    let totalFormulaAmount = 0;
+
+    const rows = recipeData.map((r, i) => {
+      const herb = herbs.find(h => String(h.id) === String(r.herbId));
+      const rateInfo = getItemRateAndAmount(r, herb);
+      totalFormulaQty += parseFloat(r.quantity) || 0;
+      totalFormulaAmount += rateInfo.amount || 0;
+
+      return `
       <tr>
         <td class="c">${i + 1}</td>
         <td class="code">${esc(r.herbCode)}</td>
         <td class="bold">${esc(r.herbName)}</td>
-        <td class="r">${esc(r.quantity)} ${esc(r.unit)}</td>
-      </tr>
-    `).join('');
+        <td class="r bold">${esc(r.quantity)} ${esc(r.unit)}</td>
+        <td class="r">${esc(rateInfo.rateLabel)}</td>
+        <td class="r bold">${esc(rateInfo.amountLabel)}</td>
+      </tr>`;
+    }).join('');
 
     const html = `<!DOCTYPE html>
 <html>
@@ -983,6 +1077,9 @@ export default function FormulaPage() {
     .c { text-align: center; } .r { text-align: right; }
     .code { font-family: monospace; font-weight: 700; font-size: 14px; color: #143521; }
     .bold { font-weight: 700; font-size: 14px; color: #0f172a; }
+    .desc-box { margin-top: 18px; padding: 12px 14px; background: #f8faf8; border: 1px solid #94a3b8; border-radius: 6px; }
+    .desc-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #1e3a2b; margin-bottom: 5px; }
+    .desc-content { font-size: 13.5px; color: #0f172a; white-space: pre-wrap; line-height: 1.5; }
     .foot { margin-top: 30px; color: #475569; font-size: 12.5px; font-weight: 500; border-top: 1px dashed #94a3b8; padding-top: 10px; display: flex; justify-content: space-between; }
     .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; font-size: 13px; font-weight: 600; color: #111827; }
     .signatures div { border-top: 1px solid #94a3b8; padding-top: 8px; text-align: center; color: #334155; }
@@ -990,35 +1087,50 @@ export default function FormulaPage() {
   </style>
 </head>
 <body>
-  <div class="brand">Uttam Laboratories</div>
+  <div class="brand">${esc(medFirm)}</div>
   <div class="sub">Ayurvedic Stock &amp; Inventory</div>
   <h1>AYURVEDIC MEDICINE FORMULA SPECIFICATION</h1>
   <div class="meta">
     <div><span>Medicine Code</span><strong class="code">${esc(code)}</strong></div>
     <div><span>Medicine Name</span><strong>${esc(name)}</strong></div>
+    <div><span>Firm Name</span><strong>${esc(medFirm)}</strong></div>
     <div><span>Base Formula</span><strong>${esc(baseQty)} ${esc(baseUnit)}</strong></div>
-    <div><span>Total Ingredients</span><strong>${recipeData.length} herbs</strong></div>
-    ${medDesc ? `<div style="grid-column: span 2;"><span>Description / Notes</span><strong>${esc(medDesc)}</strong></div>` : ''}
+    <div><span>Total Ingredients</span><strong>${recipeData.length} elements</strong></div>
     <div><span>Printed Date</span><strong>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></div>
   </div>
   <table>
     <thead>
       <tr>
         <th class="c" style="width: 40px;">#</th>
-        <th style="width: 120px;">Herb Code</th>
+        <th style="width: 140px;">Element Code</th>
         <th>Element</th>
         <th class="r" style="width: 150px;">Quantity</th>
+        <th class="r" style="width: 130px;">Rate / Unit</th>
+        <th class="r" style="width: 150px;">Amount</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
+    <tfoot>
+      <tr style="background: #e8efe9; font-weight: 700; border-top: 2px solid #1e3a2b;">
+        <td colspan="3" class="bold" style="text-align: right; text-transform: uppercase;">Total Base Formula:</td>
+        <td class="r bold" style="font-size: 14px; color: #143521;">${round4(totalFormulaQty)} ${esc(baseUnit)}</td>
+        <td class="r bold" style="text-align: right; text-transform: uppercase;">Total Cost:</td>
+        <td class="r bold" style="font-size: 14px; color: #143521;">₹${totalFormulaAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+    </tfoot>
   </table>
+  ${medDesc ? `
+  <div class="desc-box">
+    <div class="desc-title">Description / Preparation Notes</div>
+    <div class="desc-content">${esc(medDesc)}</div>
+  </div>` : ''}
   <div class="signatures">
     <div>Prepared / Checked By</div>
-    <div>Authorized Signatory (Uttam Laboratories)</div>
+    <div>Authorized Signatory (${esc(medFirm)})</div>
   </div>
   <div class="foot">
     <span>Formula Specification Sheet — ${esc(code)}</span>
-    <span>Uttam Laboratories</span>
+    <span>${esc(medFirm)}</span>
   </div>
 </body>
 </html>`;
@@ -1074,8 +1186,9 @@ export default function FormulaPage() {
         <td class="c">${idx + 1}</td>
         <td class="code">${esc(m.code)}</td>
         <td class="bold">${esc(m.name)}</td>
+        <td>${esc(m.firmName || '—')}</td>
         <td class="c">${esc(m.formulaQuantity ?? 1)} ${esc(m.formulaUnit || 'PIECES')}</td>
-        <td class="c">${m.hasRecipe ? `${m.recipeItemsCount} herbs` : '—'}</td>
+        <td class="c">${m.hasRecipe ? `${m.recipeItemsCount} elements` : '—'}</td>
         <td class="c">${m.hasRecipe ? '<span style="color:#2d5a3d;font-weight:600;">Configured</span>' : '<span style="color:#777;">Not Configured</span>'}</td>
       </tr>
     `).join('');
@@ -1119,6 +1232,7 @@ export default function FormulaPage() {
         <th class="c" style="width: 35px;">#</th>
         <th style="width: 110px;">Medicine Code</th>
         <th>Medicine Name</th>
+        <th>Firm Name</th>
         <th class="c" style="width: 120px;">Base Formula</th>
         <th class="c" style="width: 100px;">Ingredients</th>
         <th class="c" style="width: 110px;">Status</th>
@@ -1149,13 +1263,17 @@ export default function FormulaPage() {
     setPreviewModalOpen(true);
   };
 
-  const selectedMedicine = medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId));
+  const selectedMedicine = useMemo(() => (
+    medicineOptions.find(m => String(m.medicineCodeId) === String(selectedMedicineCodeId))
+  ), [medicineOptions, selectedMedicineCodeId]);
 
-  const filteredMedicines = medicineOptions.filter(m => {
-    if (!overviewSearch.trim()) return true;
+  const filteredMedicines = useMemo(() => {
+    if (!overviewSearch.trim()) return medicineOptions;
     const q = overviewSearch.toLowerCase().trim();
-    return m.code.toLowerCase().includes(q) || m.name.toLowerCase().includes(q);
-  });
+    return medicineOptions.filter(m => (
+      m.code.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
+    ));
+  }, [medicineOptions, overviewSearch]);
 
   const viewColumns = [
     {
@@ -1169,12 +1287,12 @@ export default function FormulaPage() {
     },
     {
       key: 'herbName',
-      label: 'Herb',
+      label: 'Element',
       render: r => {
         const opt = herbOptions.find(o => String(o.herbCodeId) === String(r.herbCodeId));
         const herb = herbs.find(h => h.id === parseInt(r.herbId, 10));
         const code = opt?.code || herb?.herbCode;
-        const name = r.herbName || herb?.name || opt?.name || 'Herb';
+        const name = r.herbName || herb?.name || opt?.name || 'Element';
         return (
           <div>
             <div className="font-medium text-ink">{name}</div>
@@ -1236,6 +1354,13 @@ export default function FormulaPage() {
       ),
     },
     {
+      key: 'firmName',
+      label: 'Firm Name',
+      render: m => (
+        <span className="font-medium text-slate-800">{m.firmName || '—'}</span>
+      ),
+    },
+    {
       key: 'baseFormula',
       label: 'Base Formula',
       render: m => (
@@ -1248,7 +1373,7 @@ export default function FormulaPage() {
       key: 'status',
       label: 'Status',
       render: m => (m.hasRecipe ? (
-        <Badge variant="success">Configured ({m.recipeItemsCount} herbs)</Badge>
+        <Badge variant="success">Configured ({m.recipeItemsCount} elements)</Badge>
       ) : (
         <Badge variant="warning">Not Configured</Badge>
       )),
@@ -1315,7 +1440,7 @@ export default function FormulaPage() {
     {
       key: 'herbs',
       label: 'Ingredients',
-      render: m => <Badge variant="neutral">{m.recipeItemsCount} herbs</Badge>,
+      render: m => <Badge variant="neutral">{m.recipeItemsCount} elements</Badge>,
     },
     {
       key: 'actions',
@@ -1360,7 +1485,7 @@ export default function FormulaPage() {
     {
       key: 'herbs',
       label: 'Ingredients',
-      render: m => <Badge variant="neutral">{m.recipeItemsCount} herbs</Badge>,
+      render: m => <Badge variant="neutral">{m.recipeItemsCount} elements</Badge>,
     },
     {
       key: 'actions',
@@ -1378,7 +1503,7 @@ export default function FormulaPage() {
   ];
 
   const generateColumns = [
-    { key: 'herbName', label: 'Herb' },
+    { key: 'herbName', label: 'Element' },
     { key: 'quantityPerUnit', label: 'Qty / Base', render: r => `${r.quantityPerUnit} ${r.unitOfMeasure || ''}` },
     { key: 'scaledQuantity', label: 'Required', render: r => `${r.scaledQuantity} ${r.unitOfMeasure || ''}` },
     {
@@ -1558,7 +1683,8 @@ export default function FormulaPage() {
                     </div>
                     <p className="text-base text-muted font-medium mt-1">
                       Base formula: <strong className="text-forest-900 font-bold underline decoration-2">{formulaQuantity} {formulaUnit}</strong>
-                      {hasRecipe && ` · ${recipe.length} herb${recipe.length === 1 ? '' : 's'} defined`}
+                      {' · '}Firm: <strong className="text-forest-900 font-bold">{firmName || selectedMedicine?.firmName || 'Uttam Laboratories'}</strong>
+                      {hasRecipe && ` · ${recipe.length} element${recipe.length === 1 ? '' : 's'} defined`}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1582,7 +1708,7 @@ export default function FormulaPage() {
                         }}
                         className="flex items-center gap-1.5 shadow-xs"
                       >
-                        <Plus className="w-4 h-4" /> Add Herb
+                        <Plus className="w-4 h-4" /> Add Element
                       </Button>
                     )}
                   </div>
@@ -1612,7 +1738,7 @@ export default function FormulaPage() {
                           }}
                           className="flex items-center gap-1.5 shadow-xs"
                         >
-                          <Plus className="w-4 h-4" /> Add Herb to Formula
+                          <Plus className="w-4 h-4" /> Add Element to Formula
                         </Button>
                       </div>
                     )}
@@ -1631,10 +1757,10 @@ export default function FormulaPage() {
                         }`}>
                           <span className="text-forest-900">Base Medicine Quantity: <strong className="underline decoration-2">{formatQtyLabel(medQty, formulaUnit)}</strong></span>
                           {' · '}
-                          <span className="text-forest-900">Total Herbs: <strong className="underline decoration-2">{formatQtyLabel(herbTotal, formulaUnit)}</strong></span>
+                          <span className="text-forest-900">Total Elements: <strong className="underline decoration-2">{formatQtyLabel(herbTotal, formulaUnit)}</strong></span>
                           {matched && <span className="ml-2 text-emerald-800 font-black">✓ balanced (100%)</span>}
-                          {tooLow && <span className="ml-2 text-rose-700 font-black">⚠ herb sum is less than base medicine quantity</span>}
-                          {!matched && !tooLow && medQty > 0 && herbTotal > 0 && <span className="ml-2 text-amber-800 font-black">⚠ herb sum exceeds base medicine quantity</span>}
+                          {tooLow && <span className="ml-2 text-rose-700 font-black">⚠ Element sum is less than base medicine quantity</span>}
+                          {!matched && !tooLow && medQty > 0 && herbTotal > 0 && <span className="ml-2 text-amber-800 font-black">⚠ Element sum exceeds base medicine quantity</span>}
                         </div>
                       );
                     })()}
@@ -1721,13 +1847,21 @@ export default function FormulaPage() {
                 onUnitChange={e => setFormulaUnit(e.target.value)}
                 disabled={!canWrite}
               />
+              <Input
+                label="Firm Name"
+                placeholder="e.g. Uttam Laboratories"
+                value={firmName}
+                onChange={e => setFirmName(e.target.value)}
+                className="w-64"
+                disabled={!canWrite}
+              />
             </div>
 
             {medicineOptions.length === 0 && (
               <Alert type="info">No medicine codes found. Add codes under Medicine Codes first.</Alert>
             )}
             {herbOptions.length === 0 && (
-              <Alert type="info">No herb codes found. Add codes under Herb Codes first.</Alert>
+              <Alert type="info">No element codes found. Add codes under Element Codes first.</Alert>
             )}
             {message && !selectedMedicineCodeId && <Alert type="error">{message}</Alert>}
 
@@ -1747,15 +1881,15 @@ export default function FormulaPage() {
                           {idx + 1}
                         </div>
                         <DropdownSelect
-                          label={idx === 0 ? 'Herb' : ''}
+                          label={idx === 0 ? 'Element' : ''}
                           searchable
-                          searchPlaceholder="Type herb code or name..."
-                          placeholder="Select herb code"
+                          searchPlaceholder="Type element code or name..."
+                          placeholder="Select element code"
                           className="flex-1"
                           value={item.herbCodeId ? String(item.herbCodeId) : ''}
                           onChange={val => selectHerbForRow(idx, val)}
                           options={[
-                            { value: '', label: 'Select herb code' },
+                            { value: '', label: 'Select element code' },
                             ...herbOptions.map(h => ({
                               value: String(h.herbCodeId),
                               label: `${h.code} — ${h.name}${!h.herbId ? ' (Not in Store)' : ` (${h.unit}) — stock: ${h.stock}`}`,
@@ -1764,7 +1898,7 @@ export default function FormulaPage() {
                         />
                         <Input
                           data-recipe-qty={idx}
-                          label={idx === 0 ? 'Herb Qty' : ''}
+                          label={idx === 0 ? 'Element Qty' : ''}
                           type="number"
                           min="0"
                           step="0.0001"
@@ -1774,13 +1908,13 @@ export default function FormulaPage() {
                           className="w-36"
                         />
                         <Select
-                          label={idx === 0 ? 'Herb Unit' : ''}
+                          label={idx === 0 ? 'Element Unit' : ''}
                           value={item.unit}
                           onChange={e => updateItem(idx, 'unit', e.target.value)}
                           className="w-40"
                           disabled={!unitSource}
                         >
-                          {!unitSource && <option value="">Select herb first</option>}
+                          {!unitSource && <option value="">Select element first</option>}
                           {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
                         </Select>
                         {canWrite && <Button variant="danger" size="md" onClick={() => removeItem(idx)}>Remove</Button>}
@@ -1806,10 +1940,10 @@ export default function FormulaPage() {
                     >
                       <span className="text-forest-900">Medicine: <strong className="underline decoration-2">{formatQtyLabel(medQty, formulaUnit)}</strong></span>
                       {' · '}
-                      <span className="text-forest-900">Herbs total: <strong className="underline decoration-2">{formatQtyLabel(herbTotal, formulaUnit)}</strong></span>
+                      <span className="text-forest-900">Elements total: <strong className="underline decoration-2">{formatQtyLabel(herbTotal, formulaUnit)}</strong></span>
                       {matched && <span className="ml-2 inline-flex items-center gap-1 text-emerald-800 font-black">✓ Totals match perfectly</span>}
-                      {tooLow && <span className="ml-2 inline-flex items-center gap-1 text-rose-700 font-black">⚠ Herbs are less than medicine quantity</span>}
-                      {!matched && !tooLow && medQty > 0 && herbTotal > 0 && <span className="ml-2 inline-flex items-center gap-1 text-amber-800 font-black">⚠ Herbs exceed medicine quantity</span>}
+                      {tooLow && <span className="ml-2 inline-flex items-center gap-1 text-rose-700 font-black">⚠ Elements are less than medicine quantity</span>}
+                      {!matched && !tooLow && medQty > 0 && herbTotal > 0 && <span className="ml-2 inline-flex items-center gap-1 text-amber-800 font-black">⚠ Elements exceed medicine quantity</span>}
                     </div>
                   );
                 })()}
@@ -1824,7 +1958,7 @@ export default function FormulaPage() {
                       rows={2}
                     />
                     <div className="flex gap-2">
-                      <Button variant="secondary" onClick={addItem}>Add Herb</Button>
+                      <Button variant="secondary" onClick={addItem}>Add Element</Button>
                       <Button onClick={handleSave} disabled={saving || !selectedMedicineCodeId}>{saving ? 'Saving...' : 'Save Formula'}</Button>
                     </div>
                   </>
@@ -1857,7 +1991,7 @@ export default function FormulaPage() {
                   { value: '', label: 'Choose a medicine' },
                   ...medicineOptions.filter(m => m.hasRecipe).map(m => ({
                     value: String(m.medicineCodeId),
-                    label: `${m.code} — ${m.name} (${m.recipeItemsCount || 'configured'} herbs)`,
+                    label: `${m.code} — ${m.name} (${m.recipeItemsCount || 'configured'} elements)`,
                   })),
                 ]}
               />
@@ -1906,7 +2040,7 @@ export default function FormulaPage() {
                     <div className="flex flex-wrap gap-2">
                       {recipe.map((r, i) => (
                         <span key={i} className="inline-flex items-center px-2.5 py-1 rounded bg-surface text-ink text-xs font-medium border border-line">
-                          {r.herbName || 'Herb'}: <strong>{r.quantity} {r.unit}</strong>
+                          {r.herbName || 'Element'}: <strong>{r.quantity} {r.unit}</strong>
                         </span>
                       ))}
                     </div>
@@ -2034,7 +2168,7 @@ export default function FormulaPage() {
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <p className="text-sm text-muted">
-                      Base formula: <strong className="text-ink">{baseFormulaQuantity} {baseFormulaUnit}</strong>. Herb requirements scale dynamically to your entered batch quantity.
+                      Base formula: <strong className="text-ink">{baseFormulaQuantity} {baseFormulaUnit}</strong>. Element requirements scale dynamically to your entered batch quantity.
                     </p>
                     {description && (
                       <p className="text-sm text-ink bg-surface/80 rounded-lg p-2.5 border border-line">
@@ -2078,7 +2212,7 @@ export default function FormulaPage() {
                             onClick={handleConsume}
                             disabled={generating || saving}
                           >
-                            Consume Herbs
+                            Consume Elements
                           </Button>
                         )}
                       </div>
@@ -2200,7 +2334,7 @@ export default function FormulaPage() {
                   { value: '', label: 'Choose medicine formula to print' },
                   ...medicineOptions.filter(m => m.hasRecipe).map(m => ({
                     value: String(m.medicineCodeId),
-                    label: `${m.code} — ${m.name} (${m.recipeItemsCount} herbs)`,
+                    label: `${m.code} — ${m.name} (${m.recipeItemsCount} elements)`,
                   })),
                 ]}
               />
@@ -2325,7 +2459,7 @@ export default function FormulaPage() {
             </strong>?
           </p>
           <p className="text-xs text-muted">
-            This will remove all herb ingredients configured in the formula. The medicine code itself will not be deleted.
+            This will remove all element ingredients configured in the formula. The medicine code itself will not be deleted.
           </p>
           <div className="flex justify-end gap-2 pt-2 border-t border-line">
             <Button variant="secondary" onClick={() => setDeleteConfirmOpen(false)}>
@@ -2338,25 +2472,25 @@ export default function FormulaPage() {
         </div>
       </Modal>
 
-      {/* Consume Herbs Confirmation Modal */}
+      {/* Consume Elements Confirmation Modal */}
       <Modal
         open={consumeConfirmOpen}
         onClose={() => setConsumeConfirmOpen(false)}
-        title="Confirm Consume Herbs"
+        title="Confirm Consume Elements"
         size="md"
       >
         <div className="space-y-4">
           {generated?.sufficient === false || generated?.items?.some(it => it.sufficient === false) ? (
             <Alert type="error">
-              Some herbs have insufficient stock. Consuming will reduce their available inventory into negative numbers.
+              Some elements have insufficient stock. Consuming will reduce their available inventory into negative numbers.
             </Alert>
           ) : (
             <p className="text-sm text-ink">
-              This will deduct the required herb quantities directly from current stock.
+              This will deduct the required element quantities directly from current stock.
             </p>
           )}
           <p className="text-xs text-muted">
-            Are you sure you want to proceed with consuming these herbs?
+            Are you sure you want to proceed with consuming these elements?
           </p>
           <div className="flex justify-end gap-2 pt-2 border-t border-line">
             <Button variant="secondary" onClick={() => setConsumeConfirmOpen(false)}>

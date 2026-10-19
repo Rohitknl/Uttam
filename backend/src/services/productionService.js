@@ -36,7 +36,7 @@ export async function getAllProduction() {
 export async function startProduction(medicineId, quantity) {
   const preview = await previewProduction(medicineId, quantity);
   if (!preview.sufficient) {
-    throw new AppError('Insufficient herb stock for production', 400);
+    throw new AppError('Insufficient element stock for production', 400);
   }
   if (preview.requirements.length === 0) {
     throw new AppError('No formula defined for this medicine', 400);
@@ -68,7 +68,7 @@ export async function completeProduction(id, data) {
 
   const preview = await previewProduction(batch.medicineId, toNumber(batch.quantity));
   if (!preview.sufficient) {
-    throw new AppError('Insufficient herb stock to complete production', 400);
+    throw new AppError('Insufficient element stock to complete production', 400);
   }
 
   return prisma.$transaction(async (tx) => {

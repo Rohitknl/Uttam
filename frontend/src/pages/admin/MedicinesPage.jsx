@@ -125,7 +125,12 @@ export default function MedicinesPage() {
     medicinesApi.getAll({ search: search || undefined }).then(setItems).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load();
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -458,11 +463,11 @@ export default function MedicinesPage() {
           </div>
           {modal !== 'create' && (
             <Input
-              label="Edit/Delete Herb Password"
+              label="Edit/Delete Element Password"
               type="password"
               value={crudPassword}
               onChange={e => setCrudPassword(e.target.value)}
-              placeholder="Enter Edit/Delete Herb Password"
+              placeholder="Enter Edit/Delete Element Password"
             />
           )}
           <div className="flex justify-end gap-2 pt-2">
@@ -476,11 +481,11 @@ export default function MedicinesPage() {
         {error && <Alert type="error" className="mb-4">{error}</Alert>}
         <p className="text-sm text-muted mb-4">Are you sure you want to delete this medicine?</p>
         <Input
-          label="Edit/Delete Herb Password"
+          label="Edit/Delete Element Password"
           type="password"
           value={deletePassword}
           onChange={e => setDeletePassword(e.target.value)}
-          placeholder="Enter Edit/Delete Herb Password"
+          placeholder="Enter Edit/Delete Element Password"
         />
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>

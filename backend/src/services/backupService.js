@@ -2,7 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { execFileSync } from 'child_process';
+import { execFileSync, execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -116,11 +119,15 @@ function driveExists(letter) {
  * ============================================================
  */
 
-export function getAvailableDrives() {
+let _cachedDrives = null;
+let _cachedDrivesTime = 0;
+const DRIVES_CACHE_TTL = 30000;
+
+export async function getAvailableDrives(forceRefresh = false) {
   if (process.platform !== 'win32') {
     return getNonWindowsDestinations();
   }
-  return getWindowsDrives();
+  return await getWindowsDrives(forceRefresh);
 }
 
 /** Drive-type number → human-readable label */
@@ -135,18 +142,18 @@ function driveTypeLabel(type) {
 }
 
 /**
- * Use PowerShell to enumerate all logical disks in one call.
+ * Use PowerShell to enumerate all logical disks in one call asynchronously.
  * Returns null on failure so the caller can fall back.
  */
-function getWindowsDrivesViaPowerShell() {
+async function getWindowsDrivesViaPowerShell() {
   try {
-    const raw = execFileSync(
+    const { stdout: raw } = await execFileAsync(
       'powershell.exe',
       [
         '-NoProfile', '-NonInteractive', '-Command',
         'Get-WmiObject -Class Win32_LogicalDisk | Select-Object DeviceID,DriveType,VolumeName | ConvertTo-Json -Compress',
       ],
-      { encoding: 'utf8', timeout: 6000, windowsHide: true },
+      { encoding: 'utf8', timeout: 5000, windowsHide: true },
     );
 
     const parsed = JSON.parse(raw.trim());
@@ -176,10 +183,15 @@ function getWindowsDrivesFallback() {
  * Each entry's `path` points to the dedicated backup subfolder
  * (e.g. D:\UttamLab\Backups) so backups never land in the root.
  */
-function getWindowsDrives() {
-  const raw = getWindowsDrivesViaPowerShell() || getWindowsDrivesFallback();
+async function getWindowsDrives(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && _cachedDrives && (now - _cachedDrivesTime < DRIVES_CACHE_TTL)) {
+    return _cachedDrives;
+  }
 
-  return raw
+  const raw = (await getWindowsDrivesViaPowerShell()) || getWindowsDrivesFallback();
+
+  const drives = raw
     .filter(d => {
       const letter = String((d.DeviceID || d.letter || '').replace(':', '')).toUpperCase();
       if (!/^[A-Z]$/.test(letter)) return false;
@@ -208,6 +220,10 @@ function getWindowsDrives() {
         path:   backupPath,
       };
     });
+
+  _cachedDrives = drives;
+  _cachedDrivesTime = now;
+  return drives;
 }
 
 /**
@@ -259,8 +275,8 @@ function getNonWindowsDestinations() {
  * ============================================================
  */
 
-export function getBackupDestinations() {
-  return getAvailableDrives();
+export async function getBackupDestinations(forceRefresh = false) {
+  return await getAvailableDrives(forceRefresh);
 }
 
 /*
@@ -626,7 +642,7 @@ export function decodeFolderId(folderId) {
  * ============================================================
  */
 
-function resolveDestination(
+async function resolveDestination(
   destinationId,
   folderPath = null
 ) {
@@ -661,7 +677,7 @@ function resolveDestination(
   /*
    * 3. Check known drive destinations (dir_desktop, drive_c, etc.)
    */
-  const knownDests = getAvailableDrives();
+  const knownDests = await getAvailableDrives();
   const known = knownDests.find(d => d.id === destinationId);
   if (known) {
     return {
@@ -783,12 +799,12 @@ function listDbFiles(dir) {
  * ============================================================
  */
 
-export function listBackups(
+export async function listBackups(
   destinationId,
   folderPath = null
 ) {
   const dest =
-    resolveDestination(
+    await resolveDestination(
       destinationId,
       folderPath
     );
@@ -836,7 +852,7 @@ export async function createBackup(
   folderPath = null
 ) {
   const dest =
-    resolveDestination(
+    await resolveDestination(
       destinationId,
       folderPath
     );
@@ -999,7 +1015,7 @@ export async function restoreBackup(
       type: 'folder',
     };
   } else {
-    dest = resolveDestination(destinationId, folderPath);
+    dest = await resolveDestination(destinationId, folderPath);
     sourcePath = validateBackupFilePath(dest.path, fileName);
   }
 
@@ -1389,7 +1405,8 @@ export async function resetDatabaseToEmpty() {
   }
 
   // 1. Create a safety backup in _pre_reset directory
-  const defaultDest = getAvailableDrives()[0];
+  const drives = await getAvailableDrives();
+  const defaultDest = drives[0];
   const targetDir = defaultDest ? defaultDest.path : path.dirname(dbPath);
   const safetyDir = path.join(targetDir, '_pre_reset');
   ensureDir(safetyDir);
@@ -1455,7 +1472,7 @@ export async function resetDatabaseToEmpty() {
  * ============================================================
  */
 
-export function browseDrive(
+export async function browseDrive(
   driveLetter
 ) {
   const letter =
@@ -1484,8 +1501,9 @@ export function browseDrive(
     );
   }
 
+  const drives = await getAvailableDrives();
   const drive =
-    getAvailableDrives().find(
+    drives.find(
       (item) =>
         item.letter === letter
     );

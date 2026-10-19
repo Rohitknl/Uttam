@@ -129,7 +129,12 @@ export default function HerbsPage() {
     herbsApi.getAll({ search: search || undefined }).then(setItems).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load();
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -195,7 +200,7 @@ export default function HerbsPage() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
-    let rangeLabel = 'All Herbs';
+    let rangeLabel = 'All Elements';
     if (printMode === 'codeRange') {
       rangeLabel = `Code Range: ${fromCode || (sortedItems[0]?.herbCode ?? 'Start')} to ${toCode || (sortedItems[sortedItems.length - 1]?.herbCode ?? 'End')}`;
     } else if (printMode === 'rowRange') {
@@ -221,7 +226,7 @@ export default function HerbsPage() {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Herbs Directory - Uttam Laboratories</title>
+  <title>Elements Directory - Uttam Laboratories</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 20px; color: #111827; font-size: 14px; }
     .brand { font-size: 22px; font-weight: 800; color: #1e3a2b; letter-spacing: 0.5px; }
@@ -248,7 +253,7 @@ export default function HerbsPage() {
 <body>
   <div class="brand">Uttam Laboratories</div>
   <div class="sub">Ayurvedic Stock &amp; Inventory</div>
-  <h1>HERBS INVENTORY DIRECTORY</h1>
+  <h1>ELEMENTS INVENTORY DIRECTORY</h1>
   <div class="meta">
     <div>Filter:<strong>${esc(rangeLabel)}</strong></div>
     <div>Total Records:<strong>${printableItems.length}</strong></div>
@@ -332,7 +337,7 @@ export default function HerbsPage() {
     const rateValue = String(form.costPerUnit ?? '').trim();
 
     const missing = [];
-    if (!String(form.herbCodeId || '').trim()) missing.push('Herb Code');
+    if (!String(form.herbCodeId || '').trim()) missing.push('Element Code');
     if (!String(form.name || '').trim()) missing.push('Element');
     if (!String(form.unitOfMeasure || '').trim()) missing.push('Unit');
     if (!stockValue) missing.push('Total Stock');
@@ -341,7 +346,7 @@ export default function HerbsPage() {
     if (!String(form.storeNumber || '').trim()) missing.push('Store Number');
     if (!String(form.kanasterBora || '').trim()) missing.push('Kanaster/Bora/Drum');
     if (!String(form.kanasterBoraNumber || '').trim()) missing.push('Kanaster/Bora/Drum Number');
-    if (!isCreate && !crudPassword) missing.push('Edit/Delete Herb Password');
+    if (!isCreate && !crudPassword) missing.push('Edit/Delete Element Password');
 
     if (missing.length) {
       setError(`Please fill all fields: ${missing.join(', ')}`);
@@ -422,10 +427,10 @@ export default function HerbsPage() {
       className: 'w-16',
       render: r => (
         <div className="flex gap-2">
-          <button onClick={() => openEdit(r)} className="text-forest-700 hover:text-forest-950" title="Edit herb">
+          <button onClick={() => openEdit(r)} className="text-forest-700 hover:text-forest-950" title="Edit element">
             <Pencil className="w-4 h-4" />
           </button>
-          <button onClick={() => openDelete(r.id)} className="text-red-500 hover:text-red-700" title="Delete herb">
+          <button onClick={() => openDelete(r.id)} className="text-red-500 hover:text-red-700" title="Delete element">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -438,14 +443,14 @@ export default function HerbsPage() {
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="shrink-0">
           <PageHeader
-            title="Herbs"
+            title="Elements"
             subtitle="Combined raw material inventory — stock totals from all bills"
             action={
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={openPrintModal}>
                   <Printer className="w-4 h-4" /> Print
                 </Button>
-                {canWrite && <Button onClick={openCreate}><Plus className="w-4 h-4" /> Add Herb</Button>}
+                {canWrite && <Button onClick={openCreate}><Plus className="w-4 h-4" /> Add Element</Button>}
               </div>
             }
           />
@@ -465,7 +470,7 @@ export default function HerbsPage() {
       <Modal
         open={!!modal}
         onClose={() => setModal(null)}
-        title={modal === 'create' ? 'Add Herb' : 'Edit Herb'}
+        title={modal === 'create' ? 'Add Element' : 'Edit Element'}
         size="full"
         scrollable
         footer={(
@@ -479,7 +484,7 @@ export default function HerbsPage() {
         <div className="grid grid-cols-3 gap-x-3 gap-y-2">
           <div className="col-span-2">
             <DropdownSelect
-              label="Herb Code"
+              label="Element Code"
               value={form.herbCodeId}
               placeholder="Select code"
               options={[
@@ -556,26 +561,26 @@ export default function HerbsPage() {
           {modal !== 'create' && (
             <div className="col-span-3">
               <Input
-                label="Edit/Delete Herb Password"
+                label="Edit/Delete Element Password"
                 type="password"
                 value={crudPassword}
                 onChange={e => setCrudPassword(e.target.value)}
-                placeholder="Enter Edit/Delete Herb Password"
+                placeholder="Enter Edit/Delete Element Password"
               />
             </div>
           )}
         </div>
       </Modal>
 
-      <Modal open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setError(''); }} title="Delete Herb">
+      <Modal open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setError(''); }} title="Delete Element">
         {error && <Alert type="error" className="mb-4">{error}</Alert>}
-        <p className="text-sm text-muted mb-4">Are you sure you want to delete this herb from inventory?</p>
+        <p className="text-sm text-muted mb-4">Are you sure you want to delete this element from inventory?</p>
         <Input
-          label="Edit/Delete Herb Password"
+          label="Edit/Delete Element Password"
           type="password"
           value={deletePassword}
           onChange={e => setDeletePassword(e.target.value)}
-          placeholder="Enter Edit/Delete Herb Password"
+          placeholder="Enter Edit/Delete Element Password"
         />
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
@@ -587,7 +592,7 @@ export default function HerbsPage() {
       <Modal
         open={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
-        title="Print Herbs Inventory"
+        title="Print Elements Inventory"
       >
         <div className="space-y-4">
           <div>
@@ -602,7 +607,7 @@ export default function HerbsPage() {
                     : 'bg-surface/50 text-ink border-line hover:bg-surface'
                 }`}
               >
-                All Herbs
+                All Elements
               </button>
               <button
                 type="button"
@@ -697,7 +702,7 @@ export default function HerbsPage() {
 
           {printMode === 'series' && seriesOptions.length > 0 && (
             <div className="p-3 bg-surface/40 border border-line rounded-lg space-y-3">
-              <p className="text-xs text-muted">Filter and print only herbs belonging to a specific series prefix.</p>
+              <p className="text-xs text-muted">Filter and print only elements belonging to a specific series prefix.</p>
               <Select
                 label="Select Series"
                 value={printSeries}
@@ -738,7 +743,7 @@ export default function HerbsPage() {
       <PrintPreviewModal
         open={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
-        title="Herbs Inventory Directory"
+        title="Elements Inventory Directory"
         subtitle={`${printableItems.length} record(s) selected`}
         html={previewHtml}
       />

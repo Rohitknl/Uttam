@@ -150,7 +150,7 @@ export default function BackupPage() {
 
   const handleBackup = async () => {
     if (!backupPassword.trim()) {
-      setError('Enter Edit/Delete Herb Password to create a backup');
+      setError('Enter Edit/Delete Element Password to create a backup');
       return;
     }
     const targetDest = customBackupPath || backupDestinationId;
@@ -182,7 +182,7 @@ export default function BackupPage() {
       return;
     }
     if (!restorePassword.trim()) {
-      setError('Enter Edit/Delete Herb Password to restore a backup');
+      setError('Enter Edit/Delete Element Password to restore a backup');
       return;
     }
     setError('');
@@ -211,7 +211,7 @@ export default function BackupPage() {
 
   const promptResetEmpty = () => {
     if (!resetPassword.trim()) {
-      setError('Enter Edit/Delete Herb Password to reset all application data');
+      setError('Enter Edit/Delete Element Password to reset all application data');
       return;
     }
     setError('');
@@ -283,7 +283,7 @@ export default function BackupPage() {
               Data Backup
             </div>
             <p className="text-sm text-muted">
-              Saves a snapshot of herbs, medicines, bills, and orders to any folder or drive on your computer.
+              Saves a snapshot of elements, medicines, bills, and orders to any folder or drive on your computer.
             </p>
 
             <div className="space-y-2">
@@ -323,7 +323,7 @@ export default function BackupPage() {
             </div>
 
             <Input
-              label="Edit/Delete Herb Password"
+              label="Edit/Delete Element Password"
               type="password"
               value={backupPassword}
               onChange={e => setBackupPassword(e.target.value)}
@@ -390,7 +390,7 @@ export default function BackupPage() {
             </div>
 
             <Input
-              label="Edit/Delete Herb Password"
+              label="Edit/Delete Element Password"
               type="password"
               value={restorePassword}
               onChange={e => setRestorePassword(e.target.value)}
@@ -414,12 +414,12 @@ export default function BackupPage() {
         <Card className="border-red-200 bg-red-50/20">
           <CardBody className="space-y-4">
             <p className="text-sm text-gray-600">
-              Clear all raw herbs, medicines, supplier bills, formulas, and orders. A safety backup will be saved automatically before clearing.
+              Clear all raw elements, medicines, supplier bills, formulas, and orders. A safety backup will be saved automatically before clearing.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1 w-full">
                 <Input
-                  label="Edit/Delete Herb Password"
+                  label="Edit/Delete Element Password"
                   type="password"
                   value={resetPassword}
                   onChange={e => setResetPassword(e.target.value)}
@@ -489,7 +489,7 @@ export default function BackupPage() {
             Are you sure you want to permanently reset all application data to empty?
           </p>
           <div className="p-3 bg-red-50 text-red-900 border border-red-200 rounded-lg text-xs leading-relaxed">
-            <strong>Critical:</strong> This will erase all raw herbs, medicines, supplier bills, formulas, and dealer orders. A safety backup will be created in <code>_pre_reset</code> prior to wiping.
+            <strong>Critical:</strong> This will erase all raw elements, medicines, supplier bills, formulas, and dealer orders. A safety backup will be created in <code>_pre_reset</code> prior to wiping.
           </div>
         </div>
       </Modal>

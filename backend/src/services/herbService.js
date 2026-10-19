@@ -16,6 +16,7 @@ function formatHerb(herb, latestRate) {
     storeNumber: herb.storeNumber,
     kanasterBora: herb.kanasterBora,
     kanasterBoraNumber: herb.kanasterBoraNumber,
+    supplierName: herb.supplierName || null,
     description: herb.description,
     active: herb.active,
     createdAt: herb.createdAt,
@@ -96,7 +97,7 @@ export async function getHerbById(id) {
     where: { id },
     include: { herbCode: true },
   });
-  if (!herb) throw new AppError('Herb not found', 404);
+  if (!herb) throw new AppError('Element not found', 404);
   const rateMap = await getLatestRatesForHerbs([herb.id]);
   return formatHerb(herb, rateMap.get(herb.id)?.rate);
 }
@@ -115,7 +116,7 @@ async function assertKanasterBoraUnique({ kanasterBora, kanasterBoraNumber, excl
   });
   if (existing) {
     throw new AppError(
-      `${type} number "${number}" is already assigned to herb "${existing.name}". Each Kanaster/Bora/Drum number can only be used once.`,
+      `${type} number "${number}" is already assigned to element "${existing.name}". Each Kanaster/Bora/Drum number can only be used once.`,
       400,
     );
   }
@@ -123,7 +124,7 @@ async function assertKanasterBoraUnique({ kanasterBora, kanasterBoraNumber, excl
 
 export async function ensureHerbFromCode(herbCodeId) {
   const code = await prisma.herbCode.findUnique({ where: { id: herbCodeId } });
-  if (!code) throw new AppError('Herb code not found', 404);
+  if (!code) throw new AppError('Element code not found', 404);
 
   const existing = await prisma.herb.findFirst({
     where: { herbCodeId },
@@ -158,7 +159,7 @@ export async function createHerb(data) {
   if (data.herbCodeId) {
     herbCodeObj = await prisma.herbCode.findUnique({ where: { id: data.herbCodeId } });
     const existing = await prisma.herb.findFirst({ where: { herbCodeId: data.herbCodeId } });
-    if (existing) throw new AppError('Herb code is already assigned to another herb', 400);
+    if (existing) throw new AppError('Element code is already assigned to another element', 400);
   }
 
   let finalNumber = data.kanasterBoraNumber || null;
@@ -192,10 +193,10 @@ export async function createHerb(data) {
 
 export async function updateHerb(id, data) {
   const herb = await prisma.herb.findUnique({ where: { id } });
-  if (!herb) throw new AppError('Herb not found', 404);
+  if (!herb) throw new AppError('Element not found', 404);
   if (data.herbCodeId && data.herbCodeId !== herb.herbCodeId) {
     const existing = await prisma.herb.findFirst({ where: { herbCodeId: data.herbCodeId, id: { not: id } } });
-    if (existing) throw new AppError('Herb code is already assigned to another herb', 400);
+    if (existing) throw new AppError('Element code is already assigned to another element', 400);
   }
   const nextType = data.kanasterBora !== undefined ? data.kanasterBora : herb.kanasterBora;
   const nextNumber = data.kanasterBoraNumber !== undefined ? data.kanasterBoraNumber : herb.kanasterBoraNumber;
@@ -220,11 +221,11 @@ export async function updateHerb(id, data) {
 
 export async function deleteHerb(id) {
   const herb = await prisma.herb.findUnique({ where: { id } });
-  if (!herb) throw new AppError('Herb not found', 404);
+  if (!herb) throw new AppError('Element not found', 404);
 
   const recipeUsage = await prisma.recipeItem.count({ where: { herbId: id } });
   if (recipeUsage > 0) {
-    throw new AppError('Cannot delete herb used in formulas', 400);
+    throw new AppError('Cannot delete element used in formulas', 400);
   }
 
   await prisma.herb.delete({ where: { id } });

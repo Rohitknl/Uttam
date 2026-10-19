@@ -47,7 +47,7 @@ export async function setCrudPassword(_userId, {
     const confirmValue = currentPassword || loginPassword || '';
     if (!confirmValue) {
       throw new AppError(
-        'Enter your current Edit/Delete Herb Password, or your login password to reset',
+        'Enter your current Edit/Delete Element Password, or your login password to reset',
         400,
       );
     }
@@ -58,7 +58,7 @@ export async function setCrudPassword(_userId, {
 
     if (!crudOk && !loginOk) {
       throw new AppError(
-        'Password is incorrect. Use the current Edit/Delete Herb Password, or your login password.',
+        'Password is incorrect. Use the current Edit/Delete Element Password, or your login password.',
         403,
       );
     }
@@ -70,8 +70,8 @@ export async function setCrudPassword(_userId, {
   return {
     crudPasswordSet: true,
     message: alreadySet
-      ? 'Edit/Delete Herb Password reset successfully'
-      : 'Edit/Delete Herb Password set successfully',
+      ? 'Edit/Delete Element Password reset successfully'
+      : 'Edit/Delete Element Password set successfully',
   };
 }
 

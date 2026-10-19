@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { unpackDescription } from './recipeService.js';
 
 function formatHerbName(name) {
   if (name == null || name === '') return name;
@@ -54,7 +55,7 @@ export async function getAvailableHerbCodes(search) {
 
 export async function getHerbCodeById(id) {
   const code = await prisma.herbCode.findUnique({ where: { id } });
-  if (!code) throw new AppError('Herb code not found', 404);
+  if (!code) throw new AppError('Element code not found', 404);
   const herbs = await prisma.herb.findMany({ where: { herbCodeId: id } });
   return enrichCode(code, herbs);
 }
@@ -62,7 +63,7 @@ export async function getHerbCodeById(id) {
 export async function createHerbCode(data) {
   const codeValue = String(data.code || '').trim().toUpperCase();
   const existing = await prisma.herbCode.findUnique({ where: { code: codeValue } });
-  if (existing) throw new AppError('Herb code already exists', 400);
+  if (existing) throw new AppError('Element code already exists', 400);
   const code = await prisma.herbCode.create({
     data: { code: codeValue, name: formatHerbName(data.name) },
   });
@@ -71,11 +72,11 @@ export async function createHerbCode(data) {
 
 export async function updateHerbCode(id, data) {
   const code = await prisma.herbCode.findUnique({ where: { id } });
-  if (!code) throw new AppError('Herb code not found', 404);
+  if (!code) throw new AppError('Element code not found', 404);
   const nextCode = data.code !== undefined ? String(data.code).trim().toUpperCase() : undefined;
   if (nextCode && nextCode !== code.code) {
     const existing = await prisma.herbCode.findUnique({ where: { code: nextCode } });
-    if (existing) throw new AppError('Herb code already exists', 400);
+    if (existing) throw new AppError('Element code already exists', 400);
   }
   const updated = await prisma.herbCode.update({
     where: { id },
@@ -90,20 +91,22 @@ export async function updateHerbCode(id, data) {
 
 export async function deleteHerbCode(id) {
   const code = await prisma.herbCode.findUnique({ where: { id } });
-  if (!code) throw new AppError('Herb code not found', 404);
+  if (!code) throw new AppError('Element code not found', 404);
   const linked = await prisma.herb.findFirst({ where: { herbCodeId: id } });
-  if (linked) throw new AppError('Cannot delete herb code that is assigned to a herb', 400);
+  if (linked) throw new AppError('Cannot delete element code that is assigned to an element', 400);
   await prisma.herbCode.delete({ where: { id } });
 }
 
 async function enrichMedicineCode(code, linkedMedicines) {
   const linked = linkedMedicines.find(m => m.medicineCodeId === code.id);
   const recipeItemsCount = code._count?.recipeItems ?? (code.recipeItems ? code.recipeItems.length : 0);
+  const unpacked = unpackDescription(code.description);
   return {
     id: code.id,
     code: code.code,
     name: code.name,
-    description: code.description,
+    firmName: unpacked.firmName,
+    description: unpacked.description,
     formulaQuantity: code.formulaQuantity,
     formulaUnit: code.formulaUnit,
     hasRecipe: recipeItemsCount > 0,

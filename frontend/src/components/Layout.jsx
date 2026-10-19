@@ -10,11 +10,11 @@ import {
 const adminNav = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { group: 'Codes & Registry' },
-  { to: '/admin/herb-codes', icon: Tag, label: 'Herb Codes' },
+  { to: '/admin/herb-codes', icon: Tag, label: 'Element Codes' },
   { to: '/admin/medicine-codes', icon: Tag, label: 'Medicine Codes' },
   { group: 'Raw Materials' },
   { to: '/admin/bills', icon: Receipt, label: 'Bills' },
-  { to: '/admin/herbs', icon: Leaf, label: 'Herbs' },
+  { to: '/admin/herbs', icon: Leaf, label: 'Elements' },
   { group: 'Finished Goods' },
   { to: '/admin/medicines', icon: Pill, label: 'Medicines' },
   {

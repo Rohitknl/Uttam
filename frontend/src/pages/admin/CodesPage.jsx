@@ -197,7 +197,12 @@ export default function CodesPage({
     return api.getAll(search || undefined).then(setItems).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load();
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const applySeriesSeed = (list, seriesValue) => {
     if (!useSeries) {
@@ -572,11 +577,11 @@ export default function CodesPage({
           )}
           {needsPasswordOnSave && (
             <Input
-              label="Edit/Delete Herb Password"
+              label="Edit/Delete Element Password"
               type="password"
               value={crudPassword}
               onChange={e => setCrudPassword(e.target.value)}
-              placeholder="Enter Edit/Delete Herb Password"
+              placeholder="Enter Edit/Delete Element Password"
             />
           )}
           <div className="flex justify-end gap-2 pt-2">
@@ -597,11 +602,11 @@ export default function CodesPage({
         <p className="text-sm text-muted mb-4">Are you sure you want to delete this code?</p>
         {requireCrudPassword && (
           <Input
-            label="Edit/Delete Herb Password"
+            label="Edit/Delete Element Password"
             type="password"
             value={deletePassword}
             onChange={e => setDeletePassword(e.target.value)}
-            placeholder="Enter Edit/Delete Herb Password"
+            placeholder="Enter Edit/Delete Element Password"
           />
         )}
         <div className="flex justify-end gap-2 pt-4">
