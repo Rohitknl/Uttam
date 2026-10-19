@@ -74,7 +74,8 @@ export async function completeProduction(id, data) {
   return prisma.$transaction(async (tx) => {
     for (const req of preview.requirements) {
       const herb = await tx.herb.findUnique({ where: { id: req.herbId } });
-      const newStock = subtract(herb.currentStock, req.requiredQuantity);
+      const deductQty = req.requiredInStockUnit !== undefined ? req.requiredInStockUnit : req.requiredQuantity;
+      const newStock = subtract(herb.currentStock, deductQty);
       await tx.herb.update({
         where: { id: req.herbId },
         data: { currentStock: toNumber(newStock) },

@@ -131,53 +131,6 @@ export async function updateRecipeByMedicineCodeId(medicineCodeId, data) {
     throw new AppError('Medicine quantity must be greater than 0', 400);
   }
 
-  const toBase = (quantity, unit) => {
-    const q = toNumber(quantity);
-    switch (unit) {
-      case 'KG': return q * 1000;
-      case 'GRAMS': return q;
-      case 'LITERS': return q * 1000;
-      case 'ML': return q;
-      case 'PIECES': return q;
-      default: return q;
-    }
-  };
-  const fromBase = (baseQty, unit) => {
-    const q = toNumber(baseQty);
-    switch (unit) {
-      case 'KG': return q / 1000;
-      case 'GRAMS': return q;
-      case 'LITERS': return q / 1000;
-      case 'ML': return q;
-      case 'PIECES': return q;
-      default: return q;
-    }
-  };
-
-  let herbBase = 0;
-  for (const item of items) {
-    if (UNIT_FAMILY[item.unit] !== UNIT_FAMILY[medUnit]) {
-      throw new AppError(
-        `Element unit ${item.unit} cannot be matched to medicine unit ${medUnit}. Use the same unit type.`,
-        400,
-      );
-    }
-    herbBase += toBase(item.quantity, item.unit);
-  }
-  const herbTotal = fromBase(herbBase, medUnit);
-  if (herbTotal + 1e-9 < medQty) {
-    throw new AppError(
-      `Element total (${herbTotal} ${medUnit}) is less than medicine quantity (${medQty} ${medUnit})`,
-      400,
-    );
-  }
-  if (herbTotal > medQty + 1e-9) {
-    throw new AppError(
-      `Element total (${herbTotal} ${medUnit}) is more than medicine quantity (${medQty} ${medUnit})`,
-      400,
-    );
-  }
-
   await prisma.$transaction(async (tx) => {
     if (formulaQuantity !== undefined || formulaUnit !== undefined || packedDescription !== undefined) {
       await tx.medicineCode.update({

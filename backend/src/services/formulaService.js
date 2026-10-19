@@ -246,6 +246,7 @@ export async function previewProduction(medicineId, quantity) {
       unitOfMeasure: req.unitOfMeasure,
       stockUnit: req.stockUnit,
       requiredQuantity: req.scaledQuantity,
+      requiredInStockUnit: req.requiredInStockUnit,
       availableStock: req.availableStock,
       availableInRecipeUnit: req.availableInRecipeUnit,
       sufficient: req.sufficient,
