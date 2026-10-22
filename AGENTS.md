@@ -216,3 +216,19 @@ Users requested displaying a selectable Firm Name dropdown (which was previously
 #### Verification & Benchmarks
 - **Dropdown Suggestions & Fallback**: Verified that "Uttam Laboratories" is default/first option, and all existing firms from medicine options, herbs, and bills are included and sorted.
 - **Frontend Production Build**: `npm run build` verified cleanly with 0 errors.
+
+### 2026-10-22: Zero-Data Clean App Distribution & Auto-Reset
+
+#### Problem Summary
+When installing or running the desktop application on machines that previously ran an earlier development version, Electron maintained the existing legacy database in `AppData/Roaming/uttam-laboratory/data/uttam.db` because the clean marker matched the older version string (`v1.1.0-clean-init`), retaining previous test data instead of presenting an empty application.
+
+#### Changes Made
+
+| File | Changes Made |
+|------|--------------|
+| `electron/main.cjs` & `main.cjs` | • Updated `DB_CLEAN_VERSION_MARKER` from `'v1.1.0-clean-init'` to `'v1.1.0-clean-zero-20261022'` so `ensureDatabase()` automatically backs up any legacy database and initializes a fresh, 100% clean `template.db` on application launch.<br>• Synchronized local developer and active AppData databases to `template.db` with 0 business rows across all tables. |
+
+#### Verification & Benchmarks
+- **Local Active Database**: Verified `C:\Users\yogit\AppData\Roaming\uttam-laboratory\data\uttam.db` has 0 rows across all business tables (`verify-empty-db.mjs`, exit code 0).
+- **Template DB Verification**: `template.db` verified 0 rows across all tables with default admin account only.
+- **Desktop Distribution Package**: Built clean installer executable `release/Uttam Laboratory-1.1.0-win-x64.exe`.

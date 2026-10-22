@@ -96,7 +96,7 @@ function ensureCredentials() {
   return credPath;
 }
 
-const DB_CLEAN_VERSION_MARKER = 'v1.1.0-clean-init';
+const DB_CLEAN_VERSION_MARKER = 'v1.1.0-clean-zero-20261022';
 
 function cleanAndResetDatabase(targetDbPath, templateDb, reason) {
   log(`[DB AUTO-CLEAN] Cleaning database at "${targetDbPath}". Reason: ${reason}`);
