@@ -2,9 +2,9 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Printer, Eye, Edit3, Trash2, Plus, Search, AlertTriangle, Lock, Unlock, Key } from 'lucide-react';
 import Layout from '../../components/Layout';
-import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Table, Badge, PageHeader, LoadingSpinner, Alert, Modal, PrintPreviewModal } from '../../components/ui';
+import { Card, CardBody, Button, Select, Input, Textarea, DropdownSelect, Combobox, Table, Badge, PageHeader, LoadingSpinner, Alert, Modal, PrintPreviewModal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
-import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi, settingsApi } from '../../api';
+import { medicineCodesApi, herbsApi, herbCodesApi, formulasApi, settingsApi, billsApi } from '../../api';
 import { printHtml } from '../../utils/print';
 
 const UNITS = ['KG', 'GRAMS', 'LITERS', 'ML', 'PIECES'];
@@ -200,6 +200,7 @@ export default function FormulaPage() {
   const [baseFormulaUnit, setBaseFormulaUnit] = useState('PIECES');
   const [batchNumber, setBatchNumber] = useState('');
   const [firmName, setFirmName] = useState('');
+  const [billFirms, setBillFirms] = useState([]);
   const [overviewSearch, setOverviewSearch] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSpecificMedId, setPrintSpecificMedId] = useState('');
@@ -381,17 +382,48 @@ export default function FormulaPage() {
   };
 
   const loadLists = async () => {
-    const [codes, h, herbCodes] = await Promise.all([
+    const [codes, h, herbCodes, b] = await Promise.all([
       medicineCodesApi.getAll(),
       herbsApi.getAll(),
       herbCodesApi.getAll(),
+      billsApi.getAll().catch(() => []),
     ]);
     const herbList = Array.isArray(h) ? h : [];
     const codeList = Array.isArray(herbCodes) ? herbCodes : [];
+    const billList = Array.isArray(b) ? b : [];
     setHerbs(herbList);
     setHerbOptions(buildHerbOptions(codeList, herbList));
     setMedicineOptions(buildOptions(Array.isArray(codes) ? codes : []));
+
+    const extraFirms = new Set();
+    for (const bill of billList) {
+      if (bill.consigneeName && bill.consigneeName.trim()) extraFirms.add(bill.consigneeName.trim());
+      if (bill.supplierName && bill.supplierName.trim()) extraFirms.add(bill.supplierName.trim());
+    }
+    setBillFirms(Array.from(extraFirms));
   };
+
+  const firmOptions = useMemo(() => {
+    const set = new Set();
+    set.add('Uttam Laboratories');
+    for (const m of medicineOptions) {
+      if (m.firmName && m.firmName.trim()) set.add(m.firmName.trim());
+    }
+    for (const h of herbs) {
+      if (h.supplierName && h.supplierName.trim()) set.add(h.supplierName.trim());
+    }
+    for (const f of billFirms) {
+      if (f && f.trim()) set.add(f.trim());
+    }
+    if (firmName && firmName.trim()) {
+      set.add(firmName.trim());
+    }
+    return Array.from(set).sort((a, b) => {
+      if (a.toLowerCase() === 'uttam laboratories') return -1;
+      if (b.toLowerCase() === 'uttam laboratories') return 1;
+      return a.localeCompare(b);
+    });
+  }, [medicineOptions, herbs, billFirms, firmName]);
 
   const herbsRef = useRef(herbs);
   herbsRef.current = herbs;
@@ -1880,11 +1912,12 @@ export default function FormulaPage() {
                 onUnitChange={e => setFormulaUnit(e.target.value)}
                 disabled={!canWrite}
               />
-              <Input
+              <Combobox
                 label="Firm Name"
-                placeholder="e.g. Uttam Laboratories"
+                placeholder="Select or enter firm name"
                 value={firmName}
-                onChange={e => setFirmName(e.target.value)}
+                onChange={val => setFirmName(typeof val === 'string' ? val : (val?.target?.value ?? ''))}
+                options={firmOptions}
                 className="w-64"
                 disabled={!canWrite}
               />
@@ -2215,11 +2248,12 @@ export default function FormulaPage() {
                 onChange={e => setBatchNumber(e.target.value)}
                 className="w-48"
               />
-              <Input
+              <Combobox
                 label="Firm Name"
-                placeholder="e.g. Uttam Laboratories"
+                placeholder="Select or enter firm name"
                 value={firmName}
-                onChange={e => setFirmName(e.target.value)}
+                onChange={val => setFirmName(typeof val === 'string' ? val : (val?.target?.value ?? ''))}
+                options={firmOptions}
                 className="w-56"
               />
               <Button onClick={handleGenerate} disabled={!selectedMedicineCodeId || !generateQuantity || !(parseFloat(generateQuantity) > 0) || generating}>

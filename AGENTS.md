@@ -201,3 +201,18 @@ Users requested the removal of the available stock / quantity column from the ge
 #### Verification & Benchmarks
 - **Table Alignment Verification**: Verified column symmetry across `<thead>` (6 columns), `<tbody>` (6 columns), and `<tfoot>` (colspan 3 + 3 columns = 6 columns).
 - **Frontend Production Build**: `npm run build` verified cleanly with 0 errors.
+
+### 2026-10-22: Firm Name Dropdown for Medicine Formulas
+
+#### Problem Summary
+Users requested displaying a selectable Firm Name dropdown (which was previously added as an input field) when adding or editing formulas for medicines, allowing quick selection of known firms (such as "Uttam Laboratories" and existing firms/suppliers) without requiring repetitive manual text entry.
+
+#### Changes Made
+
+| File | Changes Made |
+|------|--------------|
+| `frontend/src/pages/admin/FormulaPage.jsx` | • Replaced text `<Input>` for Firm Name with searchable `<Combobox>` dropdown suggestions on both the "Add/Edit Formula" tab and "Print Formula" tab.<br>• Implemented dynamic aggregation of `firmOptions` combining default firm ("Uttam Laboratories"), medicine code configured formula firms, element supplier names, and purchase invoice parties (`billsApi`).<br>• Preserved free-text entry so users can still type custom firm names or pick from suggestions with 1-click. |
+
+#### Verification & Benchmarks
+- **Dropdown Suggestions & Fallback**: Verified that "Uttam Laboratories" is default/first option, and all existing firms from medicine options, herbs, and bills are included and sorted.
+- **Frontend Production Build**: `npm run build` verified cleanly with 0 errors.
