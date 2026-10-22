@@ -187,3 +187,17 @@ The desktop Electron application froze and became unresponsive (Windows flagged 
 - **Frontend Production Build**: `npm run build` completed in **15.28s** (2,280 modules transformed, exit code 0).
 - **Desktop Packaging Pipeline**: `node scripts/prepare-desktop.mjs` completed with exit code 0 (clean build, template db push, 0-row verification).
 
+### 2026-10-22: Remove Available Qty Column from Print Formula
+
+#### Problem Summary
+Users requested the removal of the available stock / quantity column from the generated formula sheet and print preview to simplify printouts and batch preparation sheets, focusing strictly on required recipe quantities, rates, and amounts.
+
+#### Changes Made
+
+| File | Changes Made |
+|------|--------------|
+| `frontend/src/pages/admin/FormulaPage.jsx` | • Removed `Available Stock` table header and data cells from `buildGeneratedFormulaHtml` for printed formula sheets and print preview.<br>• Removed extraneous trailing `<td></td>` cell from `<tfoot>` to keep table column count perfectly aligned (6 columns: #, Element Code, Element, Required Qty, Rate / Unit, Amount).<br>• Removed `availableStock` column definition from `generateColumns` on the on-screen Print Formula table. |
+
+#### Verification & Benchmarks
+- **Table Alignment Verification**: Verified column symmetry across `<thead>` (6 columns), `<tbody>` (6 columns), and `<tfoot>` (colspan 3 + 3 columns = 6 columns).
+- **Frontend Production Build**: `npm run build` verified cleanly with 0 errors.

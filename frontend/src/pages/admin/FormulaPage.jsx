@@ -838,7 +838,6 @@ export default function FormulaPage() {
         <td class="r bold">${esc(r.scaledQuantity)} ${esc(r.unitOfMeasure || '')}</td>
         <td class="r">${esc(rateInfo.rateLabel)}</td>
         <td class="r bold">${esc(rateInfo.amountLabel)}</td>
-        <td class="r">${esc(r.availableInRecipeUnit ?? r.availableStock)} ${esc(r.unitOfMeasure || '')}</td>
       </tr>`;
     }).join('');
 
@@ -891,7 +890,6 @@ export default function FormulaPage() {
         <th class="r" style="width: 140px;">Required Qty</th>
         <th class="r" style="width: 130px;">Rate / Unit</th>
         <th class="r" style="width: 140px;">Amount</th>
-        <th class="r" style="width: 120px;">Available Stock</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -901,7 +899,6 @@ export default function FormulaPage() {
         <td class="r bold" style="font-size: 14px; color: #143521;">${round4(totalRequiredQty)} ${esc(generateUnit || generated.formulaUnit || '')}</td>
         <td class="r bold" style="text-align: right; text-transform: uppercase;">Total Amount:</td>
         <td class="r bold" style="font-size: 14px; color: #143521;">₹${totalRequiredAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td></td>
       </tr>
     </tfoot>
   </table>
@@ -1528,22 +1525,6 @@ export default function FormulaPage() {
     { key: 'herbName', label: 'Element' },
     { key: 'quantityPerUnit', label: 'Qty / Base', render: r => `${r.quantityPerUnit} ${r.unitOfMeasure || ''}` },
     { key: 'scaledQuantity', label: 'Required', render: r => `${r.scaledQuantity} ${r.unitOfMeasure || ''}` },
-    {
-      key: 'availableStock',
-      label: 'Available',
-      render: r => {
-        const available = r.availableInRecipeUnit ?? r.availableStock;
-        const unit = r.unitOfMeasure || '';
-        const stockNote = r.stockUnit && r.stockUnit !== r.unitOfMeasure
-          ? ` (${r.availableStock} ${r.stockUnit})`
-          : '';
-        return (
-          <Badge variant={r.sufficient === false ? 'danger' : 'success'}>
-            {available} {unit}{stockNote}
-          </Badge>
-        );
-      },
-    },
     {
       key: 'status',
       label: 'Status',
